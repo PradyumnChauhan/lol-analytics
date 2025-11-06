@@ -1,0 +1,62 @@
+/**
+ * Liquid Glass Effect Styles
+ * Based on the reference implementation with multi-layer shadows and backdrop filters
+ */
+
+.liquid-glass {
+  opacity: 0;
+  transition: opacity 0.26s ease-out;
+  /* Let content determine size - no fixed dimensions */
+  width: 100%;
+  min-height: fit-content;
+  border-radius: calc(var(--lg-radius, 16) * 1px);
+  background: hsl(0 0% 100% / var(--lg-frost, 0));
+  /* backdrop-filter will be set via inline style with url() */
+  /* Fallback blur for browsers that don't support url() */
+  backdrop-filter: blur(20px) saturate(var(--lg-saturation, 1));
+  /* Ensure proper layout flow */
+  display: block;
+  position: relative;
+  
+  /* Multi-layer box-shadow for depth effect - exact match from reference */
+  box-shadow: 
+    /* Inset shadows for inner glow */
+    0 0 2px 1px color-mix(in oklch, currentColor, transparent 85%) inset,
+    0 0 10px 4px color-mix(in oklch, currentColor, transparent 90%) inset,
+    /* Outer shadows for depth */
+    0px 4px 16px rgba(17, 17, 26, 0.05),
+    0px 8px 24px rgba(17, 17, 26, 0.05),
+    0px 16px 56px rgba(17, 17, 26, 0.05),
+    /* Additional inset shadows */
+    0px 4px 16px rgba(17, 17, 26, 0.05) inset,
+    0px 8px 24px rgba(17, 17, 26, 0.05) inset,
+    0px 16px 56px rgba(17, 17, 26, 0.05) inset;
+}
+
+.liquid-glass.liquid-glass-visible {
+  opacity: 1;
+}
+
+.liquid-glass * {
+  pointer-events: auto; /* Override the reference's pointer-events: none */
+}
+
+/* Dark mode variant - exact match from reference */
+@media (prefers-color-scheme: dark) {
+  .liquid-glass {
+    background: hsl(0 0% 0% / var(--lg-frost, 0));
+    box-shadow: 
+      0 0 2px 1px color-mix(in oklch, currentColor, transparent 65%) inset,
+      0 0 10px 4px color-mix(in oklch, currentColor, transparent 85%) inset,
+      0px 4px 16px rgba(17, 17, 26, 0.05),
+      0px 8px 24px rgba(17, 17, 26, 0.05),
+      0px 16px 56px rgba(17, 17, 26, 0.05),
+      0px 4px 16px rgba(17, 17, 26, 0.05) inset,
+      0px 8px 24px rgba(17, 17, 26, 0.05) inset,
+      0px 16px 56px rgba(17, 17, 26, 0.05) inset;
+  }
+}
+
+/* Note: backdrop-filter with url() is set via inline style in LiquidGlass component */
+/* Fallback styles are handled by the component */
+
