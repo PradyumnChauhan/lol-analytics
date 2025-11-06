@@ -3,9 +3,8 @@
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Brain, ArrowLeft, Loader2, RefreshCw, Sparkles, TrendingUp, Target, Award, BarChart3, Trophy, Users, Zap, Home, Share2, Download } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Brain, ArrowLeft, Loader2, RefreshCw, Sparkles, TrendingUp, Target, Trophy, Home } from 'lucide-react';
 import { useAIAnalytics } from '@/hooks/useAIAnalytics';
 import { aggregatePlayerDataForAI, type AIDataPayload } from '@/lib/ai/data-aggregator';
 import { FloatingAssistant } from '@/components/ai/FloatingAssistant';
@@ -37,7 +36,7 @@ interface MatchParticipant {
   quadraKills: number;
   pentaKills: number;
   teamId: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface MatchData {
@@ -60,7 +59,7 @@ interface ChampionMastery {
   lastPlayTime: number;
   chestGranted: boolean;
   championName?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface LeagueEntry {
@@ -70,7 +69,7 @@ interface LeagueEntry {
   leaguePoints: number;
   wins: number;
   losses: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface BackendSummonerData {
@@ -84,7 +83,7 @@ interface BackendSummonerData {
   summonerLevel?: number;
   name?: string;
   id?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface ChallengePlayerData {
@@ -107,9 +106,9 @@ interface ChallengePlayerData {
     value?: number;
     percentile?: number;
     achievedTime?: number;
-    [key: string]: any;
+    [key: string]: unknown;
   }>;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface PlayerData {
@@ -120,7 +119,7 @@ interface PlayerData {
   championMastery?: ChampionMastery[];
   leagueEntries?: LeagueEntry[];
   challenges?: ChallengePlayerData | null;
-  clash?: any;
+  clash?: unknown;
   region?: string;
   error?: string;
 }
@@ -156,8 +155,16 @@ export default function AIDashboardPage() {
         };
         setPlayerData(loadedData);
         
-        // Aggregate data for AI
-        const aggregated = aggregatePlayerDataForAI(loadedData);
+        // Aggregate data for AI - normalize summoner data
+        const normalizedData = {
+          ...loadedData,
+          summoner: loadedData.summoner ? {
+            ...loadedData.summoner,
+            summonerLevel: loadedData.summoner.summonerLevel ?? 0,
+            profileIconId: loadedData.summoner.profileIconId ?? 0,
+          } : undefined,
+        };
+        const aggregated = aggregatePlayerDataForAI(normalizedData);
         setAggregatedData(aggregated);
         
         // Fetch AI insights (only this API call needed, not all the data fetching)
@@ -169,7 +176,7 @@ export default function AIDashboardPage() {
       // If directly accessing URL, redirect to player dashboard with message
       if (typeof window !== 'undefined' && !sessionStorage.getItem(`ai_dashboard_access_${gameName}_${tagLine}`)) {
         // Set a flag to show message on player dashboard
-        sessionStorage.setItem(`ai_dashboard_redirect_message`, 'Please click the "AI Dashboard" button to access AI analytics.');
+        sessionStorage.setItem(`ai_dashboard_redirect_message`, 'Please click the &quot;AI Dashboard&quot; button to access AI analytics.');
         router.replace(`/player/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`);
         return;
       }
@@ -238,7 +245,7 @@ export default function AIDashboardPage() {
         if (challengeResponse.ok) {
           challenges = await challengeResponse.json();
         }
-      } catch (error) {
+      } catch {
         // Challenges not available
       }
 
@@ -250,7 +257,7 @@ export default function AIDashboardPage() {
             `${BASE_URL}/api/clash/v1/players/by-summoner/${summoner.id}?region=${platform}`
           );
           if (clashResponse.ok) {
-            const clashData = await clashResponse.json();
+            await clashResponse.json(); // clashData not used
             // If we get clash data, also fetch tournaments
             const tournamentsResponse = await fetch(
               `${BASE_URL}/api/clash/v1/tournaments?region=${platform}`
@@ -260,7 +267,7 @@ export default function AIDashboardPage() {
             }
           }
         }
-      } catch (error) {
+      } catch {
         // Clash data not available
       }
 
@@ -290,17 +297,26 @@ export default function AIDashboardPage() {
         region: loadedData.region,
       });
 
-      // Aggregate data for AI
-      const aggregated = aggregatePlayerDataForAI(loadedData);
+      // Aggregate data for AI - normalize summoner data
+      const normalizedData = {
+        ...loadedData,
+        summoner: loadedData.summoner ? {
+          ...loadedData.summoner,
+          summonerLevel: loadedData.summoner.summonerLevel ?? 0,
+          profileIconId: loadedData.summoner.profileIconId ?? 0,
+        } : undefined,
+      };
+      const aggregated = aggregatePlayerDataForAI(normalizedData);
       setAggregatedData(aggregated);
 
       // Fetch AI insights
       await fetchDashboardInsights(aggregated);
 
-    } catch (error: any) {
-      setPlayerData({ isLoading: false, error: error.message });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load player data';
+      setPlayerData({ isLoading: false, error: errorMessage });
     }
-  }, [gameName, tagLine, searchParams, fetchDashboardInsights]);
+  }, [gameName, tagLine, searchParams, fetchDashboardInsights, router]);
 
   useEffect(() => {
     loadPlayerData();
@@ -515,7 +531,7 @@ export default function AIDashboardPage() {
             <Brain className="h-20 w-20 mx-auto mb-6 text-purple-400" />
             <h2 className="text-3xl font-bold mb-4 text-gray-900">Ready for AI Analysis</h2>
             <p className="text-gray-700 mb-8 text-lg leading-relaxed">
-              Click "Refresh Insights" to generate comprehensive AI-powered analysis
+              Click &quot;Refresh Insights&quot; to generate comprehensive AI-powered analysis
             </p>
             <Button
               onClick={() => {
@@ -537,7 +553,7 @@ export default function AIDashboardPage() {
       {assistantPlayerData && (
         <FloatingAssistant
           playerData={assistantPlayerData}
-          puuid={playerData.account?.puuid}
+          playerPuuid={playerData.account?.puuid}
         />
       )}
     </div>

@@ -44,8 +44,6 @@ export function WinRateChart({ matches, puuid }: WinRateChartProps) {
     return <div className="text-slate-400">No match data available</div>;
   }
 
-  const maxWinRate = Math.max(...chartData.map(d => d.winRate));
-  const minWinRate = Math.min(...chartData.map(d => d.winRate));
 
   return (
     <div className="h-64 w-full">

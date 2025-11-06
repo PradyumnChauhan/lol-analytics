@@ -165,7 +165,7 @@ interface MatchParticipant {
   quadraKills: number;
   pentaKills: number;
   teamId: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface MatchData {
@@ -188,7 +188,7 @@ interface ChampionMastery {
   lastPlayTime: number;
   chestGranted: boolean;
   championName?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface ChallengeData {
@@ -211,9 +211,9 @@ interface ChallengeData {
     value?: number;
     percentile?: number;
     achievedTime?: number;
-    [key: string]: any;
+    [key: string]: unknown;
   }>;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface LeagueEntry {
@@ -223,7 +223,7 @@ interface LeagueEntry {
   leaguePoints: number;
   wins: number;
   losses: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface PlayerData {
@@ -231,18 +231,18 @@ interface PlayerData {
     puuid: string;
     gameName: string;
     tagLine: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
   summoner?: {
     summonerLevel: number;
     profileIconId: number;
-    [key: string]: any;
+    [key: string]: unknown;
   };
   matchDetails?: MatchData[];
   championMastery?: ChampionMastery[];
   leagueEntries?: LeagueEntry[];
   challenges?: ChallengeData | null;
-  clash?: any; // Clash data structure varies
+  clash?: unknown; // Clash data structure varies
   region?: string;
 }
 
@@ -573,14 +573,17 @@ function aggregateChampionMastery(
   }
 
   // Import champion name mapping utility
-  let getChampionName: (id: number) => string;
-  try {
-    const champions = require('@/lib/champions');
-    getChampionName = champions.getChampionName;
-  } catch {
-    // Fallback if import fails
-    getChampionName = (id: number) => `Champion_${id}`;
-  }
+  // Use dynamic import to avoid circular dependencies
+  const getChampionName = (id: number): string => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const champions = require('@/lib/champions');
+      return champions.getChampionName(id);
+    } catch {
+      // Fallback if import fails
+      return `Champion_${id}`;
+    }
+  };
 
   // Create map of champion stats from matches
   const championMatchStats = new Map<number, {
@@ -693,10 +696,13 @@ function aggregateChallengeData(challengeData: ChallengeData | null | undefined)
   
   // Handle both old (COMBAT/LEGACY) and new (IMAGINATION/VETERANCY) category names
   const getCategoryValue = (categoryKey: string): number => {
-    const category = challengeData.categoryPoints?.[categoryKey];
+    const category = challengeData.categoryPoints?.[categoryKey as keyof typeof challengeData.categoryPoints];
     if (!category) return 0;
     // Handle both object format (with current/max/percentile) and direct number format
-    return typeof category === 'object' && 'current' in category ? category.current : (typeof category === 'number' ? category : 0);
+    if (typeof category === 'object' && category !== null && 'current' in category) {
+      return (category as { current: number }).current;
+    }
+    return typeof category === 'number' ? category : 0;
   };
   
   const categoryPoints = {
@@ -748,7 +754,7 @@ function aggregateChallengeData(challengeData: ChallengeData | null | undefined)
 /**
  * Aggregate Clash/tournament data
  */
-function aggregateClashData(clashData: any): AIDataPayload['clash'] {
+function aggregateClashData(clashData: unknown): AIDataPayload['clash'] {
   // Handle null, undefined, empty array, or non-array data
   if (!clashData) {
     return {
@@ -760,9 +766,19 @@ function aggregateClashData(clashData: any): AIDataPayload['clash'] {
   // Handle non-array data (could be object or other structure)
   if (!Array.isArray(clashData)) {
     // If it's an object, try to extract array from common property names
-    const possibleArray = clashData.tournaments || clashData.data || clashData.results || [];
-    if (Array.isArray(possibleArray)) {
-      clashData = possibleArray;
+    if (typeof clashData === 'object' && clashData !== null) {
+      const clashObj = clashData as Record<string, unknown>;
+      const possibleArray = Array.isArray(clashObj.tournaments) ? clashObj.tournaments :
+                           Array.isArray(clashObj.data) ? clashObj.data :
+                           Array.isArray(clashObj.results) ? clashObj.results : null;
+      if (Array.isArray(possibleArray)) {
+        clashData = possibleArray;
+      } else {
+        return {
+          tournamentsParticipated: 0,
+          recentTournaments: [],
+        };
+      }
     } else {
       return {
         tournamentsParticipated: 0,
@@ -772,7 +788,7 @@ function aggregateClashData(clashData: any): AIDataPayload['clash'] {
   }
 
   // Handle empty array
-  if (clashData.length === 0) {
+  if (!Array.isArray(clashData) || clashData.length === 0) {
     return {
       tournamentsParticipated: 0,
       recentTournaments: [],
@@ -780,23 +796,53 @@ function aggregateClashData(clashData: any): AIDataPayload['clash'] {
   }
 
   // Clash data structure varies, so we handle it generically with safe access
-  const recentTournaments = clashData
+  interface TournamentResult {
+    tournamentId: number;
+    tournamentName: string;
+    teamName?: string;
+    teamId?: string;
+    position?: number;
+    bracketPosition: string;
+    timestamp: number;
+  }
+
+  const clashArray = clashData as Array<Record<string, unknown>>;
+  const recentTournaments: TournamentResult[] = clashArray
     .slice(0, 5)
-    .filter((tournament: any) => tournament !== null && tournament !== undefined)
-    .map((tournament: any) => ({
-      tournamentId: tournament?.id || tournament?.tournamentId || 0,
-      tournamentName: tournament?.nameKey || tournament?.name || tournament?.tournamentName || 'Tournament',
-      teamName: tournament?.team?.name || tournament?.teamName,
-      teamId: tournament?.team?.id || tournament?.teamId,
-      position: tournament?.team?.position ?? tournament?.position,
-      bracketPosition: tournament?.team?.bracketPosition || tournament?.bracketPosition || '',
-      timestamp: tournament?.startTime || tournament?.scheduleTime || tournament?.timestamp || Date.now(),
-    }))
-    .filter((t) => t.tournamentId > 0); // Filter out invalid entries
+    .filter((tournament: unknown) => tournament !== null && tournament !== undefined && typeof tournament === 'object')
+    .map((tournament: Record<string, unknown>): TournamentResult => {
+      const id = typeof tournament.id === 'number' ? tournament.id : 
+                 typeof tournament.tournamentId === 'number' ? tournament.tournamentId : 0;
+      const name = typeof tournament.nameKey === 'string' ? tournament.nameKey :
+                   typeof tournament.name === 'string' ? tournament.name :
+                   typeof tournament.tournamentName === 'string' ? tournament.tournamentName : 'Tournament';
+      const team = typeof tournament.team === 'object' && tournament.team !== null ? tournament.team as Record<string, unknown> : null;
+      const teamName = typeof tournament.teamName === 'string' ? tournament.teamName :
+                       (team && typeof team.name === 'string' ? team.name : undefined);
+      const teamId = typeof tournament.teamId === 'string' ? tournament.teamId :
+                     (team && typeof team.id === 'string' ? team.id : undefined);
+      const position = typeof tournament.position === 'number' ? tournament.position :
+                       (team && typeof team.position === 'number' ? team.position : undefined);
+      const bracketPosition = typeof tournament.bracketPosition === 'string' ? tournament.bracketPosition :
+                              (team && typeof team.bracketPosition === 'string' ? team.bracketPosition : '');
+      const timestamp = typeof tournament.startTime === 'number' ? tournament.startTime :
+                        typeof tournament.scheduleTime === 'number' ? tournament.scheduleTime :
+                        typeof tournament.timestamp === 'number' ? tournament.timestamp : Date.now();
+      return {
+        tournamentId: id,
+        tournamentName: name,
+        teamName,
+        teamId,
+        position,
+        bracketPosition,
+        timestamp,
+      };
+    })
+    .filter((t: TournamentResult) => t.tournamentId > 0); // Filter out invalid entries
 
   const bestResult = recentTournaments
-    .filter((t) => t.position !== undefined && t.position !== null)
-    .sort((a, b) => (a.position || 999) - (b.position || 999))[0];
+    .filter((t: TournamentResult) => t.position !== undefined && t.position !== null)
+    .sort((a: TournamentResult, b: TournamentResult) => (a.position || 999) - (b.position || 999))[0];
 
   return {
     tournamentsParticipated: clashData.length,
@@ -876,7 +922,7 @@ function calculatePrecomputedInsights(
 
   // Find best and worst roles (min 3 games per role)
   const rolesWithStats = Array.from(roleStats.entries())
-    .filter(([_, stats]) => stats.games >= 3)
+    .filter(([, stats]) => stats.games >= 3)
     .map(([role, stats]) => ({
       role,
       winRate: (stats.wins / stats.games) * 100,

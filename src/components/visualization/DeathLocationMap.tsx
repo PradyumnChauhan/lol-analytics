@@ -3,7 +3,7 @@
 import React from 'react';
 
 interface DeathLocationMapProps {
-  matchData: any[];
+  matchData: Array<Record<string, unknown>>;
   playerPuuid: string;
   className?: string;
 }
@@ -45,7 +45,6 @@ export function DeathLocationMap({ matchData, playerPuuid, className = '' }: Dea
   const totalDeaths = deathData.length
   const championDeaths = deathData.filter(d => d.cause === 'champion').length
   const towerDeaths = deathData.filter(d => d.cause === 'tower').length
-  const monsterDeaths = deathData.filter(d => d.cause === 'monster').length
   const avgDeathTime = deathData.length > 0 
     ? deathData.reduce((sum, d) => sum + d.gameTime, 0) / deathData.length 
     : 0
@@ -207,7 +206,7 @@ export function DeathLocationMap({ matchData, playerPuuid, className = '' }: Dea
           <div className="text-white/80 text-[10px] space-y-0.5">
             <div>• Avoid overextending without vision</div>
             <div>• Watch your positioning in team fights</div>
-            <div>• Don't chase kills into unwarded areas</div>
+            <div>• Don&apos;t chase kills into unwarded areas</div>
             <div>• Respect enemy tower range and damage</div>
           </div>
         </div>
@@ -216,22 +215,32 @@ export function DeathLocationMap({ matchData, playerPuuid, className = '' }: Dea
   );
 }
 
-function extractDeathData(matchData: any[], playerPuuid: string): DeathLocation[] {
+function extractDeathData(matchData: Array<Record<string, unknown>>, playerPuuid: string): DeathLocation[] {
   const deathData: DeathLocation[] = [];
 
   matchData.forEach(match => {
-    const participant = match.info?.participants?.find((p: any) => p.puuid === playerPuuid);
+    const matchInfo = match.info as { 
+      participants?: Array<{ puuid: string; deaths?: number; championName?: string; champLevel?: number; [key: string]: unknown }>; 
+      gameStartTimestamp?: number;
+      gameDuration?: number;
+    } | undefined;
+    const participant = matchInfo?.participants?.find((p: { puuid: string }) => p.puuid === playerPuuid);
     if (!participant) return;
 
-    const gameStartTime = match.info.gameStartTimestamp;
-    const gameDuration = match.info.gameDuration;
-    const deaths = participant.deaths || 0;
+    const gameStartTime = matchInfo?.gameStartTimestamp ?? 0;
+    const gameDuration = matchInfo?.gameDuration ?? 0;
+    const deaths = typeof participant.deaths === 'number' ? participant.deaths : 0;
+
+    if (gameDuration <= 0 || deaths <= 0) return;
 
     // Estimate death locations and causes (in real implementation, this would come from timeline data)
     for (let i = 0; i < deaths; i++) {
       const gameTime = (i / deaths) * gameDuration;
       const causes = ['champion', 'tower', 'monster', 'other'];
-      const cause = causes[Math.floor(Math.random() * causes.length)];
+      const cause = causes[Math.floor(Math.random() * causes.length)] as 'champion' | 'tower' | 'monster' | 'other';
+
+      const championName = typeof participant.championName === 'string' ? participant.championName : 'Unknown';
+      const champLevel = typeof participant.champLevel === 'number' ? participant.champLevel : 1;
 
       deathData.push({
         x: Math.random() * 100,
@@ -239,8 +248,8 @@ function extractDeathData(matchData: any[], playerPuuid: string): DeathLocation[
         timestamp: gameStartTime + gameTime,
         gameTime,
         cause,
-        champion: participant.championName || 'Unknown',
-        level: Math.min(participant.champLevel || 1, 18)
+        champion: championName,
+        level: Math.min(champLevel, 18)
       });
     }
   });
@@ -297,7 +306,7 @@ function calculateDeathRate(deathData: DeathLocation[]): number {
   return deathData.length / 10; // Assuming 10 matches for now
 }
 
-function getCommonDeathAreas(heatmap: any[]): string[] {
+function getCommonDeathAreas(heatmap: Array<{ intensity: number }>): string[] {
   const highIntensityCells = heatmap
     .filter(cell => cell.intensity >= 2)
     .sort((a, b) => b.intensity - a.intensity)
@@ -308,7 +317,7 @@ function getCommonDeathAreas(heatmap: any[]): string[] {
   );
 }
 
-function getSafeAreas(heatmap: any[]): string[] {
+function getSafeAreas(_heatmap: Array<{ intensity: number }>): string[] {
   const safeAreas = [
     'Base area - safest location',
     'Warded jungle - good vision',

@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
     }
 
     const tokenData = await tokenResponse.json();
-    const { access_token, refresh_token, id_token, expires_in } = tokenData;
+    const { access_token, refresh_token, expires_in } = tokenData;
 
     if (!access_token) {
       return NextResponse.redirect(new URL('/?error=no_access_token', request.url));
@@ -119,10 +119,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(
       new URL(`/player/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`, request.url)
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[RSO] Callback error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'unknown_error';
     return NextResponse.redirect(
-      new URL(`/?error=${encodeURIComponent(error.message || 'unknown_error')}`, request.url)
+      new URL(`/?error=${encodeURIComponent(errorMessage)}`, request.url)
     );
   }
 }

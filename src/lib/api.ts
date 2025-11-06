@@ -1,4 +1,6 @@
 // API service client for LoL Analytics backend
+import type { MatchDto } from '@/types/riot-api';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
 
 export interface SummonerData {
@@ -223,7 +225,7 @@ export class LoLAnalyticsAPI {
         );
         matchDetails = recentMatches
           .filter(result => result.status === 'fulfilled')
-          .map(result => (result as any).value);
+          .map(result => (result as PromiseFulfilledResult<MatchDto>).value);
       }
 
       return {

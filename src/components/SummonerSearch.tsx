@@ -46,33 +46,9 @@ export function SummonerSearch() {
         isProduction: false,
       });
 
-      // Use lazy-loaded API modules
-      const { summonerAPI, leagueAPI } = await import('@/lib/api');
-
-      // Search for summoner
-      const summonerResponse = await summonerAPI.getBySummonerName(searchTerm.trim());
-      
-      if (summonerResponse.error || !summonerResponse.data) {
-        setResult({
-          summoner: null,
-          rankedStats: null,
-          error: summonerResponse.error || 'Summoner not found',
-          loading: false,
-        });
-        return;
-      }
-
-      const summoner = summonerResponse.data;
-
-      // Get ranked stats
-      const rankedResponse = await leagueAPI.getRankedStats(summoner.id);
-
-      setResult({
-        summoner,
-        rankedStats: rankedResponse.error ? null : rankedResponse,
-        error: null,
-        loading: false,
-      });
+      // This component needs Riot ID format (gameName#tagLine) instead of summoner name
+      // For now, redirect to the main player search page
+      throw new Error('Please use the main player search page with Riot ID format (GameName#TAG)');
 
     } catch (error) {
       setResult({

@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Brain, X, Send, Loader2, MessageSquare } from 'lucide-react';
-import { useAIAnalytics, ChatMessage } from '@/hooks/useAIAnalytics';
+import { useAIAnalytics } from '@/hooks/useAIAnalytics';
 import { AIDataPayload } from '@/lib/ai/data-aggregator';
 
 interface FloatingAssistantProps {

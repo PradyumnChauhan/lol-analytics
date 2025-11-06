@@ -402,7 +402,7 @@ class LocalStorageManager {
   }
 
   // Complete Player Data Caching for AI Dashboard
-  getCachedPlayerData(gameName: string, tagLine: string): any | null {
+  getCachedPlayerData(gameName: string, tagLine: string): Record<string, unknown> | null {
     try {
       const key = `${this.STORAGE_PREFIX}player_data_${gameName}_${tagLine}`;
       const stored = localStorage.getItem(key);
@@ -421,7 +421,7 @@ class LocalStorageManager {
     return null;
   }
 
-  setCachedPlayerData(gameName: string, tagLine: string, data: any): void {
+  setCachedPlayerData(gameName: string, tagLine: string, data: unknown): void {
     try {
       const key = `${this.STORAGE_PREFIX}player_data_${gameName}_${tagLine}`;
       const cachedData = {

@@ -151,7 +151,7 @@ export const errorReporter = {
     // like Sentry, LogRocket, or Bugsnag
   },
   
-  reportWithContext: (error: Error, context: Record<string, any>) => {
+  reportWithContext: (error: Error, context: Record<string, unknown>) => {
     console.error('Error reported with context:', error, context);
   }
 };

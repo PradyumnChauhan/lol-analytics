@@ -1,1 +1,1 @@
-export { PlayerSearch } from './PlayerSearch';
+export { PlayerSearch } from './PlayerSearchNew';

@@ -42,7 +42,6 @@ export function KDAChart({ matches, puuid }: KDAChartProps) {
     return <div className="text-slate-400">No match data available</div>;
   }
 
-  const maxKDA = Math.max(...chartData.map(d => d.kda));
   const maxStat = Math.max(...chartData.flatMap(d => [d.kills, d.deaths, d.assists]));
 
   return (

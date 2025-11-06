@@ -1,6 +1,6 @@
 "use client"
 
-import { useParams, useRouter, useSearchParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import React, { useState, useEffect, useCallback, Suspense, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -19,13 +19,14 @@ import { DeathLocationMap } from "@/components/visualization/DeathLocationMap"
 import { ErrorBoundary } from "@/components/common/ErrorBoundary"
 import { LoadingCard } from "@/components/common/LoadingSpinner"
 import {
-  transformMatchData,
   transformMasteryData,
-  transformChallengeData,
   aggregateChampionStats,
   calculateTrends,
 } from "@/lib/api/data-transformers"
 import type { ChallengePlayerData } from "@/lib/api/endpoints/challenges"
+import { getChampionName } from "@/lib/champions"
+import type { SummonerDto, LeagueEntryDto, MatchDto } from "@/types/riot-api"
+import type { TransformedMasteryData, PerformanceTrend, ChampionStats } from "@/lib/api/data-transformers"
 import {
   ArrowLeft,
   GamepadIcon,
@@ -45,17 +46,17 @@ import { aggregatePlayerDataForAI, type AIDataPayload } from "@/lib/ai/data-aggr
 interface PlayerDataState {
   isLoading: boolean
   error: string | null
-  account: any | null
-  summoner: any | null
-  matchDetails: any[]
-  championMastery: any[]
-  leagueEntries: any[]
+  account: { puuid: string; gameName: string; tagLine: string; [key: string]: unknown } | null
+  summoner: SummonerDto | null
+  matchDetails: MatchDto[]
+  championMastery: TransformedMasteryData[]
+  leagueEntries: LeagueEntryDto[]
   challenges: ChallengePlayerData | null
-  clash: any | null
+  clash: unknown | null
   region: string | null
   analyticsData: {
-    trends: any[]
-    championStats: any[]
+    trends: PerformanceTrend[]
+    championStats: ChampionStats[]
   }
 }
 
@@ -80,9 +81,9 @@ interface MatchParticipant {
 function PlayerDashboard() {
   const router = useRouter()
   const { gameName, tagLine } = useParams<{ gameName: string; tagLine: string }>()
-  const searchParams = useSearchParams()
+  // searchParams required for Suspense boundary but not used directly
   const [activeTab, setActiveTab] = useState("overview")
-  const [selectedMatch, setSelectedMatch] = useState<any | null>(null)
+  const [selectedMatch, setSelectedMatch] = useState<MatchDto | null>(null)
   const [isMatchPopupOpen, setIsMatchPopupOpen] = useState(false)
   const [matchFilters, setMatchFilters] = useState<MatchFilter>({
     queueType: "all",
@@ -111,7 +112,7 @@ function PlayerDashboard() {
   const [challengeData, setChallengeData] = useState<ChallengePlayerData | null>(null)
   const [isChallengeLoading, setIsChallengeLoading] = useState(true)
   const [challengeError, setChallengeError] = useState<string | null>(null)
-  const [liveGameData, setLiveGameData] = useState<any | null>(null)
+  const [liveGameData, setLiveGameData] = useState<unknown | null>(null)
   const [isLiveGameLoading, setIsLiveGameLoading] = useState(true)
   const [liveGameError, setLiveGameError] = useState<string | null>(null)
   const [aggregatedAIData, setAggregatedAIData] = useState<AIDataPayload | null>(null)
@@ -130,7 +131,7 @@ function PlayerDashboard() {
       // Try to parse as JSON first
       const json = await res.json()
       return json
-    } catch (jsonError) {
+    } catch {
       // If JSON parsing fails, read as text to see what we got
       const text = await clonedRes.text()
       
@@ -158,10 +159,10 @@ function PlayerDashboard() {
         let errorMessage = `Failed to fetch player data (${res.status})`
         try {
           const errorData = await safeJsonParse(res.clone())
-          errorMessage = errorData.message || errorMessage
-        } catch (parseError: any) {
-          // If parsing fails, use status text or parse error message
-          errorMessage = res.statusText || parseError.message || errorMessage
+          errorMessage = (errorData as { message?: string })?.message || errorMessage
+        } catch {
+          // If parsing fails, use status text
+          errorMessage = res.statusText || errorMessage
         }
         throw new Error(errorMessage)
       }
@@ -226,11 +227,12 @@ function PlayerDashboard() {
           championStats: analytics,
         },
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error fetching player data:", error)
-      setPlayerData((prev) => ({ ...prev, isLoading: false, error: error.message || "An unknown error occurred" }))
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
+      setPlayerData((prev) => ({ ...prev, isLoading: false, error: errorMessage }))
     }
-  }, [gameName, tagLine])
+  }, [gameName, tagLine, BASE_URL])
 
   const fetchChallenges = useCallback(async () => {
     setIsChallengeLoading(true)
@@ -242,10 +244,10 @@ function PlayerDashboard() {
         let errorMessage = `Failed to fetch challenge data (${res.status})`
         try {
           const errorData = await safeJsonParse(res.clone())
-          errorMessage = errorData.message || errorMessage
-        } catch (parseError: any) {
-          // If parsing fails, use status text or parse error message
-          errorMessage = res.statusText || parseError.message || errorMessage
+          errorMessage = (errorData as { message?: string })?.message || errorMessage
+        } catch {
+          // If parsing fails, use status text
+          errorMessage = res.statusText || errorMessage
         }
         throw new Error(errorMessage)
       }
@@ -259,9 +261,10 @@ function PlayerDashboard() {
         setChallengeData(null)
       }
       setChallengeError(null)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error fetching challenges:", error)
-      setChallengeError(error.message || "An unknown error occurred")
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
+      setChallengeError(errorMessage)
       setChallengeData(null)
     } finally {
       setIsChallengeLoading(false)
@@ -285,10 +288,10 @@ function PlayerDashboard() {
         let errorMessage = `Failed to fetch live game data (${res.status})`
         try {
           const errorData = await safeJsonParse(res.clone())
-          errorMessage = errorData.message || errorMessage
-        } catch (parseError: any) {
-          // If parsing fails, use status text or parse error message
-          errorMessage = res.statusText || parseError.message || errorMessage
+          errorMessage = (errorData as { message?: string })?.message || errorMessage
+        } catch {
+          // If parsing fails, use status text
+          errorMessage = res.statusText || errorMessage
         }
         setLiveGameError(errorMessage)
         setLiveGameData(null)
@@ -297,9 +300,10 @@ function PlayerDashboard() {
       const data = await safeJsonParse(res)
       setLiveGameData(data)
       setLiveGameError(null)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error fetching live game:", error)
-      setLiveGameError(error.message || "An unknown error occurred")
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
+      setLiveGameError(errorMessage)
       setLiveGameData(null)
     } finally {
       setIsLiveGameLoading(false)
@@ -339,11 +343,64 @@ function PlayerDashboard() {
 
       const data = await aggregatePlayerDataForAI({
         account: playerData.account,
-        summoner: playerData.summoner,
-        matchDetails: playerData.matchDetails,
-        championMastery: playerData.championMastery,
-        leagueEntries: playerData.leagueEntries,
-        challenges: challengeData,
+        summoner: playerData.summoner as unknown as { summonerLevel: number; profileIconId: number; [key: string]: unknown } | undefined,
+        matchDetails: playerData.matchDetails as unknown as Array<{
+          metadata: { matchId: string };
+          info: {
+            gameCreation: number;
+            gameDuration: number;
+            queueId?: number;
+            gameMode?: string;
+            participants: Array<{
+              puuid: string;
+              championId: number;
+              championName: string;
+              kills: number;
+              deaths: number;
+              assists: number;
+              totalDamageDealtToChampions: number;
+              visionScore: number;
+              goldEarned: number;
+              totalMinionsKilled: number;
+              neutralMinionsKilled?: number;
+              win: boolean;
+              teamPosition: string;
+              individualPosition: string;
+              firstBloodKill: boolean;
+              firstBloodAssist: boolean;
+              doubleKills: number;
+              tripleKills: number;
+              quadraKills: number;
+              pentaKills: number;
+              teamId: number;
+              [key: string]: unknown;
+            }>;
+          };
+        }> | undefined,
+        championMastery: playerData.championMastery as unknown as Array<{
+          championId: number;
+          championLevel: number;
+          championPoints: number;
+          lastPlayTime: number;
+          chestGranted: boolean;
+          championName?: string;
+          [key: string]: unknown;
+        }> | undefined,
+        leagueEntries: playerData.leagueEntries as unknown as Array<{
+          queueType: string;
+          tier: string;
+          rank: string;
+          leaguePoints: number;
+          wins: number;
+          losses: number;
+          [key: string]: unknown;
+        }> | undefined,
+        challenges: challengeData as unknown as {
+          totalPoints?: { level: string; current: number; max: number; percentile: number };
+          categoryPoints?: { COMBAT?: number; EXPERTISE?: number; TEAMWORK?: number; COLLECTION?: number; LEGACY?: number };
+          challenges?: Array<{ challengeId: number; level?: string; value?: number; percentile?: number; achievedTime?: number; [key: string]: unknown }>;
+          [key: string]: unknown;
+        } | null | undefined,
         clash: playerData.clash,
         region: playerData.region || undefined,
       })
@@ -375,7 +432,7 @@ function PlayerDashboard() {
     fetchLiveGame()
   }
 
-  const handleMatchClick = (match: any) => {
+  const handleMatchClick = (match: MatchDto) => {
     setSelectedMatch(match)
     setIsMatchPopupOpen(true)
   }
@@ -403,8 +460,7 @@ function PlayerDashboard() {
     matchDetails,
     championMastery,
     leagueEntries,
-    challenges,
-    region,
+    // challenges and region not used in this scope
     analyticsData,
     isLoading,
     error,
@@ -413,34 +469,33 @@ function PlayerDashboard() {
   const primaryRank = useMemo(() => {
     if (!leagueEntries || leagueEntries.length === 0) return null
     // Filter for ranked solo/duo or ranked flex, prioritizing solo/duo
-    const rankedSolo = leagueEntries.find((entry: any) => entry.queueType === "RANKED_SOLO_5x5")
-    const rankedFlex = leagueEntries.find((entry: any) => entry.queueType === "RANKED_FLEX_5x5")
+    const rankedSolo = leagueEntries.find((entry: LeagueEntryDto) => entry.queueType === "RANKED_SOLO_5x5")
+    const rankedFlex = leagueEntries.find((entry: LeagueEntryDto) => entry.queueType === "RANKED_FLEX_5x5")
     return rankedSolo || rankedFlex || leagueEntries[0]
   }, [leagueEntries])
 
   const totalGames = matchDetails.length
-  const wins = matchDetails.filter((match: any) => {
+  const wins = matchDetails.filter((match: MatchDto) => {
     const participant = match.info.participants.find((p: MatchParticipant) => p.puuid === account?.puuid)
     return participant?.win
   }).length
   const winRate = totalGames > 0 ? (wins / totalGames) * 100 : 0
-  const recentForm = matchDetails.map((match: any) => {
+  const recentForm = matchDetails.map((match: MatchDto) => {
     const participant = match.info.participants.find((p: MatchParticipant) => p.puuid === account?.puuid)
     return participant?.win || false
   })
 
-  const isInGame = liveGameData && !isLiveGameLoading && !liveGameError
+  const isInGame = Boolean(liveGameData && !isLiveGameLoading && !liveGameError)
   const availableChampions = useMemo(() => {
-    const { getChampionName } = require('@/lib/champions')
     const champMap = new Map<number, string>()
     // Map champion mastery data with names
-    championMastery.forEach((cm: any) => {
+    championMastery.forEach((cm: TransformedMasteryData) => {
       if (cm.championId) {
         champMap.set(cm.championId, cm.championName || getChampionName(cm.championId))
       }
     })
     // Add champions from matches if not present
-    matchDetails.forEach((match: any) => {
+    matchDetails.forEach((match: MatchDto) => {
       match.info.participants.forEach((p: MatchParticipant) => {
         if (!champMap.has(p.championId)) {
           champMap.set(p.championId, p.championName || getChampionName(p.championId))
@@ -554,6 +609,7 @@ function PlayerDashboard() {
                 <div className="flex items-center gap-2.5">
                   <div className="relative">
                     <div className="w-12 h-12 rounded-xl overflow-hidden border-2 border-yellow-400/60 shadow-lg shadow-yellow-500/20 ring-2 ring-purple-500/30">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={`https://ddragon.leagueoflegends.com/cdn/14.19.1/img/profileicon/${summoner.profileIconId}.png`}
                         alt="Profile"
@@ -974,7 +1030,7 @@ function PlayerDashboard() {
                     <div className="rounded border border-yellow-500/20 bg-gradient-to-br from-slate-900/80 to-slate-900/60 hover:border-yellow-500/40 transition-colors shadow-lg p-2">
                       <PerformanceGraph 
                         data={analyticsData.trends} 
-                        matchData={matchDetails}
+                        matchData={matchDetails as unknown as Array<Record<string, unknown>>}
                         playerPuuid={account.puuid}
                         className="rounded" 
                       />
@@ -1000,8 +1056,11 @@ function PlayerDashboard() {
                 ) : (
                   <div className="rounded border border-yellow-500/20 bg-gradient-to-br from-slate-900/80 to-slate-900/60 hover:border-yellow-500/40 transition-colors shadow-lg p-2">
                     <StrengthsWeaknessesAnalysis
-                      matchData={matchDetails}
-                      championStats={analyticsData.championStats}
+                      matchData={matchDetails as unknown as Array<{
+                        info?: { participants?: Array<{ puuid: string; win: boolean; kills: number; deaths: number; assists: number; totalDamageDealtToChampions: number; visionScore: number; goldEarned: number; totalMinionsKilled: number; neutralMinionsKilled?: number; teamDamagePercentage?: number; wardsPlaced?: number; wardsKilled?: number; controlWardsPlaced?: number; goldPerMinute?: number; [key: string]: unknown }> };
+                        [key: string]: unknown;
+                      }>}
+                      championStats={analyticsData.championStats as unknown as Array<{ winRate: number; roles: string[]; [key: string]: unknown }>}
                       playerPuuid={account.puuid}
                       className="rounded"
                     />
@@ -1015,7 +1074,7 @@ function PlayerDashboard() {
                   <LoadingCard className="rounded border border-yellow-500/20" />
                 ) : (
                   <div className="rounded border border-yellow-500/20 bg-gradient-to-br from-slate-900/80 to-slate-900/60 hover:border-yellow-500/40 transition-colors shadow-lg p-2">
-                    <DeathLocationMap matchData={matchDetails} playerPuuid={account.puuid} className="rounded" />
+                    <DeathLocationMap matchData={matchDetails as unknown as Array<Record<string, unknown>>} playerPuuid={account.puuid} className="rounded" />
                   </div>
                 )}
               </ErrorBoundary>
@@ -1051,7 +1110,7 @@ function PlayerDashboard() {
                     }
 
                     // Filter matches
-                    let filteredMatches = matchDetails.filter((match) => {
+                    const filteredMatches = matchDetails.filter((match) => {
                       if (!match?.info?.participants || !Array.isArray(match.info.participants)) return false
                       const participant = match.info.participants.find(
                         (p: MatchParticipant) => p && p.puuid === account.puuid,
@@ -1349,11 +1408,11 @@ function PlayerDashboard() {
                               >
                                 <div className="col-span-3 flex items-center space-x-1.5">
                                   {(() => {
-                                    const { getChampionName } = require('@/lib/champions')
                                     const champName = stats.championName || getChampionName(parseInt(champId))
                                     return (
                                       <>
                                         <div className="w-8 h-8 bg-slate-700 rounded overflow-hidden border border-yellow-500/20">
+                                          {/* eslint-disable-next-line @next/next/no-img-element */}
                                           <img
                                             src={`https://ddragon.leagueoflegends.com/cdn/14.19.1/img/champion/${champName}.png`}
                                             alt={champName}
@@ -1485,7 +1544,6 @@ function PlayerDashboard() {
                 {championMastery.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1">
                     {championMastery.slice(0, 30).map((mastery, index) => {
-                      const { getChampionName } = require('@/lib/champions')
                       const champName = mastery.championName || getChampionName(mastery.championId)
                       const pointsToNext = mastery.championPointsUntilNextLevel || 0
                       const pointsSinceLast = mastery.championPointsSinceLastLevel || 0
@@ -1558,11 +1616,18 @@ function PlayerDashboard() {
                             {mastery.milestoneGrades && mastery.milestoneGrades.length > 0 && (
                               <div className="flex items-center gap-1 mb-1">
                                 <span className="text-white/50 text-xs">Grades:</span>
-                                {mastery.milestoneGrades.map((grade: string, idx: number) => (
-                                  <Badge key={idx} className="bg-yellow-500/20 text-yellow-300 text-xs px-2 py-0 border border-yellow-500/30">
-                                    {grade}
-                                  </Badge>
-                                ))}
+                                {(mastery.milestoneGrades as Array<Record<string, unknown>>).map((gradeItem, idx: number) => {
+                                  const grade = typeof gradeItem === 'object' && gradeItem !== null && 'grade' in gradeItem 
+                                    ? String(gradeItem.grade) 
+                                    : typeof gradeItem === 'string' 
+                                    ? gradeItem 
+                                    : String(gradeItem);
+                                  return (
+                                    <Badge key={idx} className="bg-yellow-500/20 text-yellow-300 text-xs px-2 py-0 border border-yellow-500/30">
+                                      {grade}
+                                    </Badge>
+                                  );
+                                })}
                               </div>
                             )}
                             {mastery.nextSeasonMilestone && (
@@ -1661,7 +1726,28 @@ function PlayerDashboard() {
                 </div>
               ) : isInGame && liveGameData ? (
                 <LiveGameDashboard
-                  liveGameData={liveGameData}
+                  liveGameData={liveGameData as {
+                    gameId: number;
+                    mapId: number;
+                    gameMode: string;
+                    gameType: string;
+                    gameQueueConfigId: number;
+                    participants: Array<{
+                      puuid: string;
+                      teamId: number;
+                      spell1Id: number;
+                      spell2Id: number;
+                      championId: number;
+                      profileIconId: number;
+                      riotId: string;
+                      bot: boolean;
+                    }>;
+                    observers?: { encryptionKey: string };
+                    platformId: string;
+                    bannedChampions: Array<{ championId: number; teamId: number; pickTurn: number }>;
+                    gameLength: number;
+                    gameStartTime?: number;
+                  }}
                   playerPuuid={account.puuid}
                   isLoading={isLiveGameLoading}
                   onRefresh={fetchLiveGame}
@@ -1686,7 +1772,129 @@ function PlayerDashboard() {
         {/* Match Detail Popup */}
         {selectedMatch && (
           <MatchDetailPopup
-            match={selectedMatch}
+            match={selectedMatch as unknown as {
+              metadata: {
+                dataVersion: string;
+                matchId: string;
+                participants: string[];
+                platformId?: string;
+              };
+              info: {
+                endOfGameResult: string;
+                gameCreation: number;
+                gameDuration: number;
+                gameEndTimestamp: number;
+                gameId: number;
+                gameMode: string;
+                gameName: string;
+                gameStartTimestamp: number;
+                gameType: string;
+                gameVersion: string;
+                mapId: number;
+                queueId?: number;
+                participants: Array<{
+                  puuid: string;
+                  championId: number;
+                  championName: string;
+                  kills: number;
+                  deaths: number;
+                  assists: number;
+                  totalDamageDealt: number;
+                  totalDamageDealtToChampions: number;
+                  physicalDamageDealtToChampions: number;
+                  magicDamageDealtToChampions: number;
+                  trueDamageDealtToChampions: number;
+                  visionScore: number;
+                  goldEarned: number;
+                  totalMinionsKilled: number;
+                  neutralMinionsKilled?: number;
+                  win: boolean;
+                  lane: string;
+                  role: string;
+                  teamPosition: string;
+                  individualPosition: string;
+                  item0: number;
+                  item1: number;
+                  item2: number;
+                  item3: number;
+                  item4: number;
+                  item5: number;
+                  item6: number;
+                  champLevel: number;
+                  damageDealtToBuildings: number;
+                  damageDealtToObjectives: number;
+                  damageSelfMitigated: number;
+                  largestKillingSpree: number;
+                  largestMultiKill: number;
+                  totalDamageTaken: number;
+                  totalHeal: number;
+                  wardsPlaced: number;
+                  wardsKilled: number;
+                  firstBloodKill: boolean;
+                  firstBloodAssist: boolean;
+                  firstTowerKill: boolean;
+                  firstTowerAssist: boolean;
+                  dragonKills?: number;
+                  baronKills?: number;
+                  turretKills?: number;
+                  inhibitorKills?: number;
+                  gameEndedInEarlySurrender: boolean;
+                  gameEndedInSurrender: boolean;
+                  teamEarlySurrendered: boolean;
+                  teamId: number;
+                  spell1Casts: number;
+                  spell2Casts: number;
+                  spell3Casts: number;
+                  spell4Casts: number;
+                  summoner1Casts: number;
+                  summoner2Casts: number;
+                  summoner1Id: number;
+                  summoner2Id: number;
+                  allInPings: number;
+                  assistMePings: number;
+                  enemyMissingPings: number;
+                  enemyVisionPings: number;
+                  getBackPings: number;
+                  holdPings: number;
+                  needVisionPings: number;
+                  onMyWayPings: number;
+                  pushPings: number;
+                  commandPings: number;
+                  visionClearedPings: number;
+                  goldSpent: number;
+                  consumablesPurchased: number;
+                  itemsPurchased: number;
+                  visionWardsBoughtInGame: number;
+                  sightWardsBoughtInGame: number;
+                  detectorWardsPlaced: number;
+                  timeCCingOthers: number;
+                  totalTimeCCDealt: number;
+                  totalTimeSpentDead: number;
+                  longestTimeSpentLiving: number;
+                  totalHealsOnTeammates: number;
+                  totalDamageShieldedOnTeammates: number;
+                  totalUnitsHealed: number;
+                  doubleKills: number;
+                  tripleKills: number;
+                  quadraKills: number;
+                  pentaKills: number;
+                  unrealKills: number;
+                  inhibitorTakedowns: number;
+                  turretTakedowns: number;
+                  turretPlatesTaken: number;
+                  nexusKills: number;
+                  nexusTakedowns: number;
+                  [key: string]: unknown;
+                }>;
+                teams?: Array<{
+                  teamId: number;
+                  win: boolean;
+                  bans?: Array<{ championId: number; pickTurn: number }>;
+                  feats?: { [key: string]: { featState: number } | undefined };
+                  objectives?: { [key: string]: { first: boolean; kills: number } | undefined };
+                }>;
+              };
+            }}
             playerPuuid={account.puuid}
             isOpen={isMatchPopupOpen}
             onClose={() => setIsMatchPopupOpen(false)}

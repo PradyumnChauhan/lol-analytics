@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
 
     // Redirect to home page
     return NextResponse.redirect(new URL('/', request.url));
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[RSO] Logout error:', error);
     return NextResponse.redirect(new URL('/?error=logout_failed', request.url));
   }

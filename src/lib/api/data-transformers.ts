@@ -29,68 +29,90 @@ export interface TransformedMatchData {
   firstBlood: boolean;
   firstTower: boolean;
   // Timeline data (if available)
-  timeline?: any;
+  timeline?: Record<string, unknown>;
 }
 
-export function transformMatchData(match: any, puuid: string): TransformedMatchData | null {
-  if (!match?.info?.participants) return null;
+export function transformMatchData(match: Record<string, unknown>, puuid: string): TransformedMatchData | null {
+  const matchInfo = match.info as { participants?: Array<{ puuid: string; [key: string]: unknown }> } | undefined;
+  if (!matchInfo?.participants) return null;
   
-  const participant = match.info.participants.find((p: any) => p.puuid === puuid);
+  const participant = matchInfo?.participants?.find((p: { puuid: string }) => p.puuid === puuid);
   if (!participant) return null;
 
-  const gameDurationMinutes = match.info.gameDuration / 60;
+  const matchInfoWithDuration = matchInfo as { gameDuration?: number } | undefined;
+  const gameDurationMinutes = (matchInfoWithDuration?.gameDuration || 0) / 60;
   
   // Calculate KDA
-  const kda = participant.deaths > 0 
-    ? (participant.kills + participant.assists) / participant.deaths 
-    : participant.kills + participant.assists;
+  const participantData = participant as { deaths?: number; kills?: number; assists?: number; totalMinionsKilled?: number; neutralMinionsKilled?: number; goldEarned?: number; totalDamageDealtToChampions?: number; visionScore?: number; teamId?: number };
+  const kda = (participantData.deaths || 0) > 0 
+    ? ((participantData.kills || 0) + (participantData.assists || 0)) / (participantData.deaths || 1)
+    : (participantData.kills || 0) + (participantData.assists || 0);
 
   // Calculate per-minute stats
-  const csPerMinute = (participant.totalMinionsKilled + (participant.neutralMinionsKilled || 0)) / gameDurationMinutes;
-  const goldPerMinute = participant.goldEarned / gameDurationMinutes;
-  const damagePerMinute = participant.totalDamageDealtToChampions / gameDurationMinutes;
-  const visionScorePerMinute = participant.visionScore / gameDurationMinutes;
+  const csPerMinute = ((participantData.totalMinionsKilled || 0) + (participantData.neutralMinionsKilled || 0)) / gameDurationMinutes;
+  const goldPerMinute = (participantData.goldEarned || 0) / gameDurationMinutes;
+  const damagePerMinute = (participantData.totalDamageDealtToChampions || 0) / gameDurationMinutes;
+  const visionScorePerMinute = (participantData.visionScore || 0) / gameDurationMinutes;
 
   // Calculate team damage/gold share
-  const teamParticipants = match.info.participants.filter((p: any) => p.teamId === participant.teamId);
-  const teamDamage = teamParticipants.reduce((sum: number, p: any) => sum + (p.totalDamageDealtToChampions || 0), 0);
-  const teamGold = teamParticipants.reduce((sum: number, p: any) => sum + (p.goldEarned || 0), 0);
+  const teamParticipants = (matchInfo?.participants || []).filter((p) => {
+    const pData = p as { teamId?: number };
+    return pData.teamId === participantData.teamId;
+  });
+  const teamDamage = teamParticipants.reduce((sum: number, p) => {
+    const pData = p as { totalDamageDealtToChampions?: number };
+    return sum + (typeof pData.totalDamageDealtToChampions === 'number' ? pData.totalDamageDealtToChampions : 0);
+  }, 0);
+  const teamGold = teamParticipants.reduce((sum: number, p) => {
+    const pData = p as { goldEarned?: number };
+    return sum + (typeof pData.goldEarned === 'number' ? pData.goldEarned : 0);
+  }, 0);
   
-  const damageShare = teamDamage > 0 ? (participant.totalDamageDealtToChampions / teamDamage) * 100 : 0;
-  const goldShare = teamGold > 0 ? (participant.goldEarned / teamGold) * 100 : 0;
+  const participantDamage = typeof participantData.totalDamageDealtToChampions === 'number' ? participantData.totalDamageDealtToChampions : 0;
+  const participantGold = typeof participantData.goldEarned === 'number' ? participantData.goldEarned : 0;
+  const damageShare = teamDamage > 0 ? (participantDamage / teamDamage) * 100 : 0;
+  const goldShare = teamGold > 0 ? (participantGold / teamGold) * 100 : 0;
 
   // Calculate kill participation
-  const teamKills = teamParticipants.reduce((sum: number, p: any) => sum + (p.kills || 0), 0);
-  const killParticipation = teamKills > 0 ? ((participant.kills + participant.assists) / teamKills) * 100 : 0;
+  const teamKills = teamParticipants.reduce((sum: number, p) => {
+    const pData = p as { kills?: number };
+    return sum + (typeof pData.kills === 'number' ? pData.kills : 0);
+  }, 0);
+  const participantKills = typeof participantData.kills === 'number' ? participantData.kills : 0;
+  const participantAssists = typeof participantData.assists === 'number' ? participantData.assists : 0;
+  const killParticipation = teamKills > 0 ? ((participantKills + participantAssists) / teamKills) * 100 : 0;
 
   // Calculate multikills
-  const multikillCount = (participant.doubleKills || 0) + 
-                        (participant.tripleKills || 0) + 
-                        (participant.quadraKills || 0) + 
-                        (participant.pentaKills || 0);
+  const multikillCount = ((participantData as { doubleKills?: number; tripleKills?: number; quadraKills?: number; pentaKills?: number }).doubleKills || 0) + 
+                        ((participantData as { doubleKills?: number; tripleKills?: number; quadraKills?: number; pentaKills?: number }).tripleKills || 0) + 
+                        ((participantData as { doubleKills?: number; tripleKills?: number; quadraKills?: number; pentaKills?: number }).quadraKills || 0) + 
+                        ((participantData as { doubleKills?: number; tripleKills?: number; quadraKills?: number; pentaKills?: number }).pentaKills || 0);
 
   // Calculate performance grade
   const performanceGrade = calculatePerformanceGrade(
     kda,
-    participant.win ? 100 : 0, // Win rate for single match
+    (participantData as { win?: boolean }).win ? 100 : 0, // Win rate for single match
     damageShare,
-    participant.visionScore,
+    participantData.visionScore || 0,
     csPerMinute,
     killParticipation,
     multikillCount
   );
 
+  const matchMetadata = match.metadata as { matchId?: string } | undefined;
+  const matchInfoForReturn = match.info as { gameCreation?: number; gameDuration?: number; gameMode?: string; gameType?: string; queueId?: number; endOfGameResult?: string } | undefined;
+
   return {
-    matchId: match.metadata.matchId,
-    gameCreation: match.info.gameCreation,
-    gameDuration: match.info.gameDuration,
-    gameMode: match.info.gameMode,
-    gameType: match.info.gameType,
-    queueId: match.info.queueId || 0,
-    endOfGameResult: match.info.endOfGameResult,
-    participant,
-    teamId: participant.teamId,
-    win: participant.win,
+    matchId: matchMetadata?.matchId || '',
+    gameCreation: matchInfoForReturn?.gameCreation || 0,
+    gameDuration: matchInfoForReturn?.gameDuration || 0,
+    gameMode: matchInfoForReturn?.gameMode || '',
+    gameType: matchInfoForReturn?.gameType || '',
+    queueId: matchInfoForReturn?.queueId || 0,
+    endOfGameResult: matchInfoForReturn?.endOfGameResult || '',
+    participant: participantData as ParticipantDto,
+    teamId: participantData.teamId || 0,
+    win: (participantData as { win?: boolean }).win || false,
     performanceGrade,
     kda,
     csPerMinute,
@@ -101,8 +123,8 @@ export function transformMatchData(match: any, puuid: string): TransformedMatchD
     damageShare,
     goldShare,
     multikillCount,
-    firstBlood: participant.firstBloodKill || participant.firstBloodAssist,
-    firstTower: participant.firstTowerKill || participant.firstTowerAssist,
+    firstBlood: ((participantData as { firstBloodKill?: boolean; firstBloodAssist?: boolean }).firstBloodKill || (participantData as { firstBloodKill?: boolean; firstBloodAssist?: boolean }).firstBloodAssist) || false,
+    firstTower: ((participantData as { firstTowerKill?: boolean; firstTowerAssist?: boolean }).firstTowerKill || (participantData as { firstTowerKill?: boolean; firstTowerAssist?: boolean }).firstTowerAssist) || false,
   };
 }
 
@@ -119,7 +141,7 @@ export interface TransformedMasteryData {
   tokensEarned: number;
   // New season milestone fields
   championSeasonMilestone?: number;
-  milestoneGrades?: any[];
+  milestoneGrades?: Array<Record<string, unknown>>;
   nextSeasonMilestone?: {
     requireGradeCounts?: Record<string, number>;
     rewardMarks?: number;
@@ -134,45 +156,54 @@ export interface TransformedMasteryData {
   nextLevelPoints: number;
 }
 
-export function transformMasteryData(mastery: any[]): TransformedMasteryData[] {
+export function transformMasteryData(mastery: Array<Record<string, unknown>>): TransformedMasteryData[] {
   // Dynamic import to avoid circular dependencies
-  let getChampionName: (id: number) => string;
-  try {
-    const champions = require('@/lib/champions');
-    getChampionName = champions.getChampionName;
-  } catch {
-    // Fallback if import fails
-    getChampionName = (id: number) => `Champion_${id}`;
-  }
+  const getChampionName = (id: number): string => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const champions = require('@/lib/champions');
+      return champions.getChampionName(id);
+    } catch {
+      // Fallback if import fails
+      return `Champion_${id}`;
+    }
+  };
   
   return mastery.map(m => {
-    const pointsToNext = m.championPointsUntilNextLevel || 0;
-    const pointsSinceLast = m.championPointsSinceLastLevel || 0;
+    const pointsToNext = typeof m.championPointsUntilNextLevel === 'number' ? m.championPointsUntilNextLevel : 0;
+    const pointsSinceLast = typeof m.championPointsSinceLastLevel === 'number' ? m.championPointsSinceLastLevel : 0;
     const totalPointsForLevel = pointsToNext + pointsSinceLast;
     const progressPercent = totalPointsForLevel > 0 ? (pointsSinceLast / totalPointsForLevel) * 100 : 0;
     
-    const lastPlayTime = m.lastPlayTime ? new Date(m.lastPlayTime) : null;
+    const lastPlayTimeValue = typeof m.lastPlayTime === 'number' ? m.lastPlayTime : (typeof m.lastPlayTime === 'string' ? parseInt(m.lastPlayTime, 10) : null);
+    const lastPlayTime = lastPlayTimeValue !== null && !isNaN(lastPlayTimeValue) ? new Date(lastPlayTimeValue) : null;
     const daysSinceLastPlay = lastPlayTime ? Math.floor((Date.now() - lastPlayTime.getTime()) / (1000 * 60 * 60 * 24)) : -1;
     
+    const championId = typeof m.championId === 'number' ? m.championId : 0;
+    const championLevel = typeof m.championLevel === 'number' ? m.championLevel : 0;
+    const championPoints = typeof m.championPoints === 'number' ? m.championPoints : 0;
+    const chestGranted = typeof m.chestGranted === 'boolean' ? m.chestGranted : false;
+    const lastPlayTimeNum = typeof m.lastPlayTime === 'number' ? m.lastPlayTime : 0;
+    
     return {
-      championId: m.championId,
-      championName: m.championName || getChampionName(m.championId),
-      championLevel: m.championLevel,
-      championPoints: m.championPoints,
+      championId,
+      championName: (typeof m.championName === 'string' ? m.championName : '') || getChampionName(championId),
+      championLevel,
+      championPoints,
       championPointsSinceLastLevel: pointsSinceLast,
       championPointsUntilNextLevel: pointsToNext,
-      chestGranted: m.chestGranted,
-      lastPlayTime: m.lastPlayTime,
-      tokensEarned: m.tokensEarned || 0,
+      chestGranted,
+      lastPlayTime: lastPlayTimeNum,
+      tokensEarned: typeof m.tokensEarned === 'number' ? m.tokensEarned : 0,
       // New season milestone fields
-      championSeasonMilestone: m.championSeasonMilestone,
-      milestoneGrades: m.milestoneGrades || [],
-      nextSeasonMilestone: m.nextSeasonMilestone,
-      markRequiredForNextLevel: m.markRequiredForNextLevel,
+      championSeasonMilestone: typeof m.championSeasonMilestone === 'number' ? m.championSeasonMilestone : undefined,
+      milestoneGrades: Array.isArray(m.milestoneGrades) ? m.milestoneGrades as Array<Record<string, unknown>> : [],
+      nextSeasonMilestone: typeof m.nextSeasonMilestone === 'object' && m.nextSeasonMilestone !== null ? m.nextSeasonMilestone as { requireGradeCounts?: Record<string, number>; rewardMarks?: number; bonus?: boolean; totalGamesRequires?: number } : undefined,
+      markRequiredForNextLevel: typeof m.markRequiredForNextLevel === 'number' ? m.markRequiredForNextLevel : undefined,
       // Calculated fields
       progressPercent,
       daysSinceLastPlay,
-      isMaxLevel: m.championLevel >= 7,
+      isMaxLevel: championLevel >= 7,
       nextLevelPoints: totalPointsForLevel,
     };
   });
@@ -202,7 +233,7 @@ export interface TransformedChallengeData {
   }>;
 }
 
-export function transformChallengeData(challenges: any): TransformedChallengeData {
+export function transformChallengeData(challenges: Record<string, unknown> | null | undefined): TransformedChallengeData {
   if (!challenges) {
     return {
       totalPoints: { current: 0, max: 0, percentile: 0 },
@@ -211,27 +242,31 @@ export function transformChallengeData(challenges: any): TransformedChallengeDat
     };
   }
 
+  const totalPointsObj = typeof challenges.totalPoints === 'object' && challenges.totalPoints !== null ? challenges.totalPoints as Record<string, unknown> : null;
+  const categoryPointsArr = Array.isArray(challenges.categoryPoints) ? challenges.categoryPoints as Array<Record<string, unknown>> : [];
+  const challengesArr = Array.isArray(challenges.challenges) ? challenges.challenges as Array<Record<string, unknown>> : [];
+  
   return {
     totalPoints: {
-      current: challenges.totalPoints?.current || 0,
-      max: challenges.totalPoints?.max || 0,
-      percentile: challenges.totalPoints?.percentile || 0
+      current: typeof totalPointsObj?.current === 'number' ? totalPointsObj.current : 0,
+      max: typeof totalPointsObj?.max === 'number' ? totalPointsObj.max : 0,
+      percentile: typeof totalPointsObj?.percentile === 'number' ? totalPointsObj.percentile : 0
     },
-    categoryPoints: challenges.categoryPoints?.map((cat: any) => ({
-      category: cat.category,
-      current: cat.current,
-      max: cat.max,
-      percentile: cat.percentile,
-      tier: cat.tier
-    })) || [],
-    challenges: challenges.challenges?.map((challenge: any) => ({
-      challengeId: challenge.challengeId,
-      level: challenge.level,
-      value: challenge.value,
-      percentile: challenge.percentile,
-      name: challenge.name || `Challenge ${challenge.challengeId}`,
-      description: challenge.description || ''
-    })) || []
+    categoryPoints: categoryPointsArr.map((cat: Record<string, unknown>) => ({
+      category: typeof cat.category === 'string' ? cat.category : '',
+      current: typeof cat.current === 'number' ? cat.current : 0,
+      max: typeof cat.max === 'number' ? cat.max : 0,
+      percentile: typeof cat.percentile === 'number' ? cat.percentile : 0,
+      tier: typeof cat.tier === 'string' ? cat.tier : ''
+    })),
+    challenges: challengesArr.map((challenge: Record<string, unknown>) => ({
+      challengeId: typeof challenge.challengeId === 'number' ? challenge.challengeId : 0,
+      level: typeof challenge.level === 'string' ? challenge.level : '',
+      value: typeof challenge.value === 'number' ? challenge.value : 0,
+      percentile: typeof challenge.percentile === 'number' ? challenge.percentile : 0,
+      name: typeof challenge.name === 'string' ? challenge.name : `Challenge ${typeof challenge.challengeId === 'number' ? challenge.challengeId : 0}`,
+      description: typeof challenge.description === 'string' ? challenge.description : ''
+    }))
   };
 }
 
@@ -259,17 +294,19 @@ export interface ChampionStats {
 }
 
 export function aggregateChampionStats(
-  matches: any[], 
-  mastery: any[], 
+  matches: Array<Record<string, unknown>>, 
+  mastery: Array<Record<string, unknown>>, 
   puuid: string
 ): ChampionStats[] {
   const championMap = new Map<number, ChampionStats>();
 
   // Initialize with mastery data
   mastery.forEach(m => {
-    championMap.set(m.championId, {
-      championId: m.championId,
-      championName: m.championName || `Champion_${m.championId}`,
+    const championId = typeof m.championId === 'number' ? m.championId : 0;
+    const lastPlayTime = typeof m.lastPlayTime === 'number' ? m.lastPlayTime : 0;
+    championMap.set(championId, {
+      championId,
+      championName: (typeof m.championName === 'string' ? m.championName : '') || `Champion_${championId}`,
       games: 0,
       wins: 0,
       winRate: 0,
@@ -281,7 +318,7 @@ export function aggregateChampionStats(
       performanceGrade: 'D',
       recentForm: [],
       roles: [],
-      lastPlayed: m.lastPlayTime || 0,
+      lastPlayed: lastPlayTime,
       multikills: 0,
       firstBloodRate: 0,
       damageShare: 0,
@@ -292,31 +329,40 @@ export function aggregateChampionStats(
 
   // Aggregate match data
   matches.forEach(match => {
-    const participant = match.info?.participants?.find((p: any) => p.puuid === puuid);
+    const matchInfo = match.info as { participants?: Array<{ puuid: string; championId?: number; [key: string]: unknown }> } | undefined;
+    const participant = matchInfo?.participants?.find((p: { puuid: string }) => p.puuid === puuid);
     if (!participant) return;
 
-    const champId = participant.championId;
+    const participantData = participant as { championId?: number; [key: string]: unknown };
+    const champId = typeof participantData.championId === 'number' ? participantData.championId : undefined;
+    if (champId === undefined) return;
     const stats = championMap.get(champId);
     if (!stats) return;
 
     stats.games++;
-    if (participant.win) stats.wins++;
+    const participantForStats = participant as { win?: boolean; deaths?: number; kills?: number; assists?: number };
+    if (participantForStats.win) stats.wins++;
     
-    const kda = participant.deaths > 0 
-      ? (participant.kills + participant.assists) / participant.deaths 
-      : participant.kills + participant.assists;
+    const kda = (participantForStats.deaths || 0) > 0 
+      ? ((participantForStats.kills || 0) + (participantForStats.assists || 0)) / (participantForStats.deaths || 1)
+      : (participantForStats.kills || 0) + (participantForStats.assists || 0);
     
     stats.avgKDA = ((stats.avgKDA * (stats.games - 1)) + kda) / stats.games;
-    stats.avgDamage = ((stats.avgDamage * (stats.games - 1)) + participant.totalDamageDealtToChampions) / stats.games;
-    stats.avgVision = ((stats.avgVision * (stats.games - 1)) + participant.visionScore) / stats.games;
-    stats.avgGold = ((stats.avgGold * (stats.games - 1)) + participant.goldEarned) / stats.games;
-    stats.avgCS = ((stats.avgCS * (stats.games - 1)) + (participant.totalMinionsKilled + (participant.neutralMinionsKilled || 0))) / stats.games;
+    const participantForAvg = participant as { totalDamageDealtToChampions?: number; visionScore?: number; goldEarned?: number };
+    stats.avgDamage = ((stats.avgDamage * (stats.games - 1)) + (participantForAvg.totalDamageDealtToChampions || 0)) / stats.games;
+    stats.avgVision = ((stats.avgVision * (stats.games - 1)) + (participantForAvg.visionScore || 0)) / stats.games;
+    stats.avgGold = ((stats.avgGold * (stats.games - 1)) + (participantForAvg.goldEarned || 0)) / stats.games;
+    const participantForCS = participant as { totalMinionsKilled?: number; neutralMinionsKilled?: number };
+    stats.avgCS = ((stats.avgCS * (stats.games - 1)) + ((participantForCS.totalMinionsKilled || 0) + (participantForCS.neutralMinionsKilled || 0))) / stats.games;
     
-    stats.recentForm.push(participant.win);
-    stats.roles.push(participant.individualPosition || participant.teamPosition || 'UNKNOWN');
-    stats.multikills += (participant.doubleKills || 0) + (participant.tripleKills || 0) + (participant.quadraKills || 0) + (participant.pentaKills || 0);
+    stats.recentForm.push(participantForStats.win || false);
+    const participantForRoles = participant as { individualPosition?: string; teamPosition?: string };
+    stats.roles.push(participantForRoles.individualPosition || participantForRoles.teamPosition || 'UNKNOWN');
+    const participantForMultikills = participant as { doubleKills?: number; tripleKills?: number; quadraKills?: number; pentaKills?: number };
+    stats.multikills += (participantForMultikills.doubleKills || 0) + (participantForMultikills.tripleKills || 0) + (participantForMultikills.quadraKills || 0) + (participantForMultikills.pentaKills || 0);
     
-    if (participant.firstBloodKill || participant.firstBloodAssist) {
+    const participantForFirstBlood = participant as { firstBloodKill?: boolean; firstBloodAssist?: boolean };
+    if (participantForFirstBlood.firstBloodKill || participantForFirstBlood.firstBloodAssist) {
       stats.firstBloodRate = ((stats.firstBloodRate * (stats.games - 1)) + 100) / stats.games;
     } else {
       stats.firstBloodRate = ((stats.firstBloodRate * (stats.games - 1)) + 0) / stats.games;
@@ -355,7 +401,7 @@ export interface PerformanceTrend {
   gamesPlayed: number;
 }
 
-export function calculateTrends(matches: any[], puuid: string): PerformanceTrend[] {
+export function calculateTrends(matches: Array<Record<string, unknown>>, puuid: string): PerformanceTrend[] {
   const trends: PerformanceTrend[] = [];
   const dailyStats = new Map<string, {
     games: number;
@@ -368,13 +414,18 @@ export function calculateTrends(matches: any[], puuid: string): PerformanceTrend
 
   // Group matches by date
   matches.forEach(match => {
-    const participant = match.info?.participants?.find((p: any) => p.puuid === puuid);
+    const matchInfo = match.info as { participants?: Array<{ puuid: string; championId?: number; [key: string]: unknown }> } | undefined;
+    const participant = matchInfo?.participants?.find((p: { puuid: string }) => p.puuid === puuid);
     if (!participant) return;
 
-    const date = new Date(match.info.gameCreation).toISOString().split('T')[0];
-    const kda = participant.deaths > 0 
-      ? (participant.kills + participant.assists) / participant.deaths 
-      : participant.kills + participant.assists;
+    const matchInfoForTrends = match.info as { gameCreation?: number; participants?: Array<{ puuid: string; deaths?: number; kills?: number; assists?: number; totalDamageDealtToChampions?: number; visionScore?: number; totalMinionsKilled?: number; [key: string]: unknown }> } | undefined;
+    const date = new Date((matchInfoForTrends?.gameCreation as number) || Date.now()).toISOString().split('T')[0];
+    const participantForTrends = matchInfoForTrends?.participants?.find((p: { puuid: string }) => p.puuid === puuid);
+    if (!participantForTrends) return;
+    const participantForTrendsKDA = participantForTrends as { deaths?: number; kills?: number; assists?: number };
+    const kda = (participantForTrendsKDA.deaths || 0) > 0 
+      ? ((participantForTrendsKDA.kills || 0) + (participantForTrendsKDA.assists || 0)) / (participantForTrendsKDA.deaths || 1)
+      : (participantForTrendsKDA.kills || 0) + (participantForTrendsKDA.assists || 0);
 
     if (!dailyStats.has(date)) {
       dailyStats.set(date, {
@@ -389,11 +440,13 @@ export function calculateTrends(matches: any[], puuid: string): PerformanceTrend
 
     const stats = dailyStats.get(date)!;
     stats.games++;
-    if (participant.win) stats.wins++;
+    const participantForTrendsWin = participantForTrends as { win?: boolean };
+    if (participantForTrendsWin.win) stats.wins++;
     stats.kda.push(kda);
-    stats.damage.push(participant.totalDamageDealtToChampions);
-    stats.vision.push(participant.visionScore);
-    stats.cs.push(participant.totalMinionsKilled + (participant.neutralMinionsKilled || 0));
+    const participantForTrendsStats = participantForTrends as { totalDamageDealtToChampions?: number; visionScore?: number; totalMinionsKilled?: number; neutralMinionsKilled?: number };
+    stats.damage.push(participantForTrendsStats.totalDamageDealtToChampions || 0);
+    stats.vision.push(participantForTrendsStats.visionScore || 0);
+    stats.cs.push((participantForTrendsStats.totalMinionsKilled || 0) + (participantForTrendsStats.neutralMinionsKilled || 0));
   });
 
   // Calculate daily averages
@@ -423,18 +476,26 @@ export function calculateTrends(matches: any[], puuid: string): PerformanceTrend
 }
 
 // Timeline Data Extraction
-export function extractTimelineData(timeline: any, puuid: string): any {
+export function extractTimelineData(timeline: Record<string, unknown>, puuid: string): Record<string, unknown> | null {
   if (!timeline?.frames) return null;
 
-  const participantId = timeline.metadata?.participants?.indexOf(puuid);
+  const metadata = typeof timeline.metadata === 'object' && timeline.metadata !== null ? timeline.metadata as Record<string, unknown> : null;
+  const participants = Array.isArray(metadata?.participants) ? metadata.participants as string[] : [];
+  const participantId = participants.indexOf(puuid);
   if (participantId === -1) return null;
 
+  const frames = Array.isArray(timeline.frames) ? timeline.frames as Array<Record<string, unknown>> : [];
   return {
-    frames: timeline.frames.map((frame: any) => ({
-      timestamp: frame.timestamp,
-      participantFrames: frame.participantFrames?.[participantId] || null,
-      events: frame.events || []
-    }))
+    frames: frames.map((frame: Record<string, unknown>) => {
+      const participantFrames = typeof frame.participantFrames === 'object' && frame.participantFrames !== null 
+        ? frame.participantFrames as Record<string | number, unknown>
+        : null;
+      return {
+        timestamp: frame.timestamp,
+        participantFrames: participantFrames && typeof participantId === 'number' ? (participantFrames[participantId] || null) : null,
+        events: Array.isArray(frame.events) ? frame.events : []
+      };
+    })
   };
 }
 
@@ -446,7 +507,7 @@ function calculatePerformanceGrade(
   visionScore: number = 0,
   csPerMinute: number = 0,
   killParticipation: number = 0,
-  multikills: number = 0
+  _multikills: number = 0
 ): string {
   let score = 0;
   

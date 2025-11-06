@@ -11,9 +11,7 @@ import {
   Trophy, 
   Eye, 
   Shield, 
-  Sword,
-  RefreshCw,
-  AlertCircle
+  RefreshCw
 } from 'lucide-react';
 import { TeamComposition } from './TeamComposition';
 import { GamePredictions } from './GamePredictions';
@@ -88,7 +86,6 @@ export function LiveGameDashboard({
   onRefresh,
   compact = false 
 }: LiveGameDashboardProps) {
-  const [gameStartTime, setGameStartTime] = useState<number>(Date.now());
   const [gameDuration, setGameDuration] = useState<string>('0:00');
 
   useEffect(() => {
@@ -96,7 +93,6 @@ export function LiveGameDashboard({
 
     // Set initial game start time (approximate)
     const initialStartTime = Date.now() - (liveGameData.gameLength * 1000);
-    setGameStartTime(initialStartTime);
 
     // Update game duration every second
     const interval = setInterval(() => {

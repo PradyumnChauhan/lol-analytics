@@ -21,15 +21,14 @@ export function ServerStatusDashboard({ className }: ServerStatusDashboardProps)
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
-  useEffect(() => {
-    loadServerStatuses();
-    const interval = setInterval(loadServerStatuses, 5 * 60 * 1000); // Update every 5 minutes
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    loadActiveIssues();
-  }, [selectedRegion, loadActiveIssues]);
+  const loadActiveIssues = useCallback(async () => {
+    try {
+      const issues = await serverStatusAPI.getActiveIssues(selectedRegion);
+      setActiveIssues(issues);
+    } catch (error) {
+      console.error('Error loading active issues:', error);
+    }
+  }, [selectedRegion]);
 
   const loadServerStatuses = async () => {
     try {
@@ -44,14 +43,15 @@ export function ServerStatusDashboard({ className }: ServerStatusDashboardProps)
     }
   };
 
-  const loadActiveIssues = useCallback(async () => {
-    try {
-      const issues = await serverStatusAPI.getActiveIssues(selectedRegion);
-      setActiveIssues(issues);
-    } catch (error) {
-      console.error('Error loading active issues:', error);
-    }
-  }, [selectedRegion]);
+  useEffect(() => {
+    loadServerStatuses();
+    const interval = setInterval(loadServerStatuses, 5 * 60 * 1000); // Update every 5 minutes
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    loadActiveIssues();
+  }, [selectedRegion, loadActiveIssues]);
 
   const getStatusIcon = (status: ServerStatusSummary['status']) => {
     switch (status) {

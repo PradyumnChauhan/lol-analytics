@@ -229,11 +229,14 @@ export function getAllChampionNames(): string[] {
  * @param masteryData - Array of mastery objects with championId
  * @returns Array of mastery objects with championName added
  */
-export function enrichMasteryWithNames(masteryData: Array<{ championId: number; [key: string]: any }>): Array<{ championId: number; championName: string; [key: string]: any }> {
-  return masteryData.map(m => ({
-    ...m,
-    championName: m.championName || getChampionName(m.championId),
-  }));
+export function enrichMasteryWithNames(masteryData: Array<{ championId: number; [key: string]: unknown }>): Array<{ championId: number; championName: string; [key: string]: unknown }> {
+  return masteryData.map(m => {
+    const existingName = typeof m.championName === 'string' ? m.championName : null;
+    return {
+      ...m,
+      championName: existingName || getChampionName(m.championId),
+    };
+  });
 }
 
 /**
@@ -241,10 +244,13 @@ export function enrichMasteryWithNames(masteryData: Array<{ championId: number; 
  * @param participants - Array of participant objects with championId
  * @returns Array of participant objects with championName added
  */
-export function enrichParticipantsWithNames(participants: Array<{ championId: number; [key: string]: any }>): Array<{ championId: number; championName: string; [key: string]: any }> {
-  return participants.map(p => ({
-    ...p,
-    championName: p.championName || getChampionName(p.championId),
-  }));
+export function enrichParticipantsWithNames(participants: Array<{ championId: number; [key: string]: unknown }>): Array<{ championId: number; championName: string; [key: string]: unknown }> {
+  return participants.map(p => {
+    const existingName = typeof p.championName === 'string' ? p.championName : null;
+    return {
+      ...p,
+      championName: existingName || getChampionName(p.championId),
+    };
+  });
 }
 

@@ -3,7 +3,7 @@
  * Component for displaying tournament bracket visualization with match results
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,21 +14,17 @@ import {
   Shield,
   Target,
   Award,
-  Users,
-  Calendar,
   Clock,
   ChevronRight,
-  Star,
-  Zap,
   CheckCircle,
   XCircle,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Star
 } from 'lucide-react';
 import { 
   ClashTeam,
   Tournament,
-  TournamentPhase,
   ClashUtils,
   clashAPI
 } from '@/lib/api/endpoints/clash';
@@ -63,7 +59,7 @@ export function TournamentBracket({ tournamentId, region = 'na1', playerPuuid }:
   const [error, setError] = useState<string | null>(null);
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
 
-  const loadTournamentData = async () => {
+  const loadTournamentData = useCallback(async () => {
     setLoading(true);
     setError(null);
     
@@ -91,7 +87,7 @@ export function TournamentBracket({ tournamentId, region = 'na1', playerPuuid }:
     } finally {
       setLoading(false);
     }
-  };
+  }, [tournamentId, region]);
 
   const generateBracketMatches = (teams: ClashTeam[]): Match[] => {
     // Simple single-elimination bracket generation
@@ -293,7 +289,7 @@ export function TournamentBracket({ tournamentId, region = 'na1', playerPuuid }:
 
   useEffect(() => {
     loadTournamentData();
-  }, [tournamentId, region]);
+  }, [loadTournamentData]);
 
   if (loading) {
     return (

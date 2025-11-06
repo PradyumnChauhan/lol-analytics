@@ -101,9 +101,9 @@ export function useAIAnalytics(): UseAIAnalyticsReturn {
 
       setDashboardInsights(insights);
       insightsCache.set(cacheKey, { data: insights, timestamp: Date.now() });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to fetch dashboard insights:', err);
-      setError(err.message || 'Failed to fetch AI insights');
+      setError(err instanceof Error ? err.message : 'Failed to fetch AI insights');
     } finally {
       setLoading(false);
       lastFetchRef.current = '';
@@ -164,9 +164,9 @@ export function useAIAnalytics(): UseAIAnalyticsReturn {
       };
 
       setChatHistory(data.conversationHistory || [...chatHistory, userMessage, assistantMessage]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to process question:', err);
-      setError(err.message || 'Failed to get AI response');
+      setError((err instanceof Error ? err.message : 'Failed to get AI response'));
       
       // Remove user message on error
       setChatHistory((prev) => prev.slice(0, -1));
@@ -220,9 +220,9 @@ export function useAIAnalytics(): UseAIAnalyticsReturn {
       };
 
       setDashboardInsights(summary);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to generate summary:', err);
-      setError(err.message || 'Failed to generate year-end summary');
+      setError(err instanceof Error ? err.message : 'Failed to generate year-end summary');
     } finally {
       setLoading(false);
     }

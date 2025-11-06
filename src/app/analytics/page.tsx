@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -103,7 +103,7 @@ interface MatchData {
   fetchedMatches: number;
 }
 
-export default function CompleteAnalyticsPage() {
+function CompleteAnalyticsPageContent() {
   const searchParams = useSearchParams();
   const puuid = searchParams.get('puuid');
   const region = searchParams.get('region') || 'br1';
@@ -608,5 +608,22 @@ export default function CompleteAnalyticsPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function CompleteAnalyticsPage() {
+  return (
+    <Suspense fallback={
+      <div className="container mx-auto py-8">
+        <Card className="bg-slate-800 border-slate-700">
+          <CardContent className="py-12 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p className="text-slate-400">Loading analytics...</p>
+          </CardContent>
+        </Card>
+      </div>
+    }>
+      <CompleteAnalyticsPageContent />
+    </Suspense>
   );
 }

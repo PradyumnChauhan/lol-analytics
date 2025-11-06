@@ -1,9 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Trophy, TrendingUp, Target, Eye, Coins, Users } from 'lucide-react';
+import { Trophy, TrendingUp, Target, Eye, Users } from 'lucide-react';
 import { PerformanceGrade, PerformanceMetrics } from '@/lib/match-analytics';
 
 interface PerformanceRatingProps {
@@ -41,7 +40,7 @@ export function PerformanceRating({
   comparison, 
   className = '' 
 }: PerformanceRatingProps) {
-  const getGradeIcon = (grade: PerformanceGrade) => {
+  const _getGradeIcon = (grade: PerformanceGrade) => {
     switch (grade) {
       case 'S+':
       case 'S':

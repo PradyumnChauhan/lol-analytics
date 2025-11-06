@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,31 +8,49 @@ import { Badge } from '@/components/ui/badge';
 import { AlertCircle, CheckCircle, Settings, Key, Cookie } from 'lucide-react';
 import LOLBackendAPI from '@/lib/lol-backend-api';
 
+interface AuthStatus {
+  isConfigured: boolean;
+  hasApiKey: boolean;
+  hasCookies: boolean;
+  lastUpdated: string | null;
+  cookieCount: number;
+}
+
+interface TestResult {
+  success: boolean;
+  error?: string;
+  testData?: {
+    gameName: string;
+    tagLine: string;
+    puuid: string;
+  };
+}
+
 export default function BackendConfig() {
   const [api] = useState(new LOLBackendAPI());
-  const [authStatus, setAuthStatus] = useState(null);
+  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState('');
-  const [testResult, setTestResult] = useState(null);
+  const [testResult, setTestResult] = useState<TestResult | null>(null);
 
-  useEffect(() => {
-    checkAuthStatus();
-  }, []);
-
-  const checkAuthStatus = async () => {
+  const checkAuthStatus = useCallback(async () => {
     try {
       setLoading(true);
       const status = await api.getAuthStatus();
       setAuthStatus(status);
       setError(null);
-    } catch (err) {
+      } catch {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
       setError(`Failed to connect to backend server. Make sure it's running on ${backendUrl}`);
     } finally {
       setLoading(false);
     }
-  };
+  }, [api]);
+
+  useEffect(() => {
+    checkAuthStatus();
+  }, [checkAuthStatus]);
 
   const configureApiKey = async () => {
     if (!apiKey.trim()) return;
@@ -43,8 +61,8 @@ export default function BackendConfig() {
       await checkAuthStatus();
       setApiKey('');
       setError(null);
-    } catch (err) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to configure API key');
     } finally {
       setLoading(false);
     }
@@ -56,8 +74,8 @@ export default function BackendConfig() {
       const result = await api.testAuth();
       setTestResult(result);
       setError(null);
-    } catch (err) {
-      setTestResult({ success: false, error: err.message });
+    } catch (err: unknown) {
+      setTestResult({ success: false, error: err instanceof Error ? err.message : 'Unknown error' });
     } finally {
       setLoading(false);
     }
@@ -196,8 +214,8 @@ export default function BackendConfig() {
             <div className="p-3 bg-yellow-50 border border-yellow-200 rounded">
               <p className="font-medium text-yellow-800">⚠️ Match-V5 API Limitation</p>
               <p className="text-yellow-700 mt-1">
-                Development API keys don't have access to Match-V5 endpoints (match history). 
-                You'll get 403 Forbidden errors when trying to fetch match data.
+                Development API keys don&apos;t have access to Match-V5 endpoints (match history). 
+                You&apos;ll get 403 Forbidden errors when trying to fetch match data.
               </p>
             </div>
 

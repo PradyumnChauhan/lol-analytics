@@ -3,7 +3,7 @@
 import React from 'react';
 
 interface WardHeatmapProps {
-  matchData: any[];
+  matchData: Array<Record<string, unknown>>;
   playerPuuid: string;
   className?: string;
   noContainer?: boolean;
@@ -170,50 +170,63 @@ export function WardHeatmap({ matchData, playerPuuid, className = '', noContaine
   );
 }
 
-function extractWardData(matchData: any[], playerPuuid: string): WardPlacement[] {
+function extractWardData(matchData: Array<Record<string, unknown>>, playerPuuid: string): WardPlacement[] {
   const wardData: WardPlacement[] = [];
 
   matchData.forEach(match => {
-    const participant = match.info?.participants?.find((p: any) => p.puuid === playerPuuid);
+    const matchInfo = match.info as { participants?: Array<{ puuid: string; wardsPlaced?: number; [key: string]: unknown }>; gameStartTimestamp?: number; gameDuration?: number } | undefined;
+    const participant = matchInfo?.participants?.find((p: { puuid: string }) => p.puuid === playerPuuid);
     if (!participant) return;
 
-    const gameStartTime = match.info.gameStartTimestamp;
-    const gameDuration = match.info.gameDuration;
+    const gameStartTime = matchInfo?.gameStartTimestamp ?? 0;
+    const gameDuration = matchInfo?.gameDuration ?? 0;
+
+    if (gameDuration <= 0) return;
 
     // Estimate ward placements based on available data
-    const wardsPlaced = participant.wardsPlaced || 0;
-    const controlWardsPlaced = participant.controlWardsPlaced || 0;
-    const wardsKilled = participant.wardsKilled || 0;
+    const participantData = participant as { wardsPlaced?: number; controlWardsPlaced?: number; wardsKilled?: number };
+    const wardsPlaced = typeof participantData.wardsPlaced === 'number' ? participantData.wardsPlaced : 0;
+    const controlWardsPlaced = typeof participantData.controlWardsPlaced === 'number' ? participantData.controlWardsPlaced : 0;
+    const wardsKilled = typeof participantData.wardsKilled === 'number' ? participantData.wardsKilled : 0;
 
     // Generate estimated ward positions (in real implementation, this would come from timeline data)
-    for (let i = 0; i < wardsPlaced; i++) {
-      wardData.push({
-        x: Math.random() * 100,
-        y: Math.random() * 100,
-        type: 'ward',
-        timestamp: gameStartTime + (i / wardsPlaced) * gameDuration,
-        gameTime: (i / wardsPlaced) * gameDuration
-      });
+    if (wardsPlaced > 0) {
+      for (let i = 0; i < wardsPlaced; i++) {
+        const gameTime = (i / wardsPlaced) * gameDuration;
+        wardData.push({
+          x: Math.random() * 100,
+          y: Math.random() * 100,
+          type: 'ward',
+          timestamp: gameStartTime + gameTime,
+          gameTime
+        });
+      }
     }
 
-    for (let i = 0; i < controlWardsPlaced; i++) {
-      wardData.push({
-        x: Math.random() * 100,
-        y: Math.random() * 100,
-        type: 'control_ward',
-        timestamp: gameStartTime + (i / controlWardsPlaced) * gameDuration,
-        gameTime: (i / controlWardsPlaced) * gameDuration
-      });
+    if (controlWardsPlaced > 0) {
+      for (let i = 0; i < controlWardsPlaced; i++) {
+        const gameTime = (i / controlWardsPlaced) * gameDuration;
+        wardData.push({
+          x: Math.random() * 100,
+          y: Math.random() * 100,
+          type: 'control_ward',
+          timestamp: gameStartTime + gameTime,
+          gameTime
+        });
+      }
     }
 
-    for (let i = 0; i < wardsKilled; i++) {
-      wardData.push({
-        x: Math.random() * 100,
-        y: Math.random() * 100,
-        type: 'sweeper',
-        timestamp: gameStartTime + (i / wardsKilled) * gameDuration,
-        gameTime: (i / wardsKilled) * gameDuration
-      });
+    if (wardsKilled > 0) {
+      for (let i = 0; i < wardsKilled; i++) {
+        const gameTime = (i / wardsKilled) * gameDuration;
+        wardData.push({
+          x: Math.random() * 100,
+          y: Math.random() * 100,
+          type: 'sweeper',
+          timestamp: gameStartTime + gameTime,
+          gameTime
+        });
+      }
     }
   });
 
@@ -267,7 +280,7 @@ function calculateWardEfficiency(wardData: WardPlacement[]): number {
   return (wardsCleared / totalWards) * 100;
 }
 
-function getBestWardAreas(heatmapGrid: any[]): string[] {
+function getBestWardAreas(heatmapGrid: Array<{ intensity: number }>): string[] {
   const highIntensityCells = heatmapGrid
     .filter(cell => cell.intensity >= 3)
     .sort((a, b) => b.intensity - a.intensity)
@@ -278,7 +291,7 @@ function getBestWardAreas(heatmapGrid: any[]): string[] {
   );
 }
 
-function getImprovementAreas(heatmapGrid: any[]): string[] {
+function getImprovementAreas(heatmapGrid: Array<{ intensity: number }>): string[] {
   const lowIntensityCells = heatmapGrid
     .filter(cell => cell.intensity === 0)
     .slice(0, 3);

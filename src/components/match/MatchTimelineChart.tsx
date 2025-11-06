@@ -4,7 +4,21 @@ import React from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 interface MatchTimelineChartProps {
-  timeline: any;
+  timeline: {
+    frames?: Array<{
+      timestamp: number;
+      participantFrames?: Record<number, {
+        gold?: number;
+        xp?: number;
+        damageStats?: { totalDamageDoneToChampions?: number };
+        minionsKilled?: number;
+        level?: number;
+      }>;
+    }>;
+    metadata?: {
+      participants?: string[];
+    };
+  } | null;
   playerPuuid: string;
   teamId: number;
   className?: string;
@@ -20,7 +34,7 @@ interface TimelineDataPoint {
   time: string; // Formatted time (e.g., "15:30")
 }
 
-export function MatchTimelineChart({ timeline, playerPuuid, teamId, className = '' }: MatchTimelineChartProps) {
+export function MatchTimelineChart({ timeline, playerPuuid, className = '' }: MatchTimelineChartProps) {
   if (!timeline?.frames) {
     return (
       <div className={`p-4 text-center text-slate-400 ${className}`}>
@@ -31,7 +45,7 @@ export function MatchTimelineChart({ timeline, playerPuuid, teamId, className = 
 
   // Find participant ID
   const participantId = timeline.metadata?.participants?.indexOf(playerPuuid);
-  if (participantId === -1) {
+  if (participantId === undefined || participantId === -1 || typeof participantId !== 'number') {
     return (
       <div className={`p-4 text-center text-slate-400 ${className}`}>
         <p>Player not found in timeline data</p>
@@ -41,23 +55,32 @@ export function MatchTimelineChart({ timeline, playerPuuid, teamId, className = 
 
   // Process timeline data
   const data: TimelineDataPoint[] = timeline.frames
-    .filter((frame: any) => frame.participantFrames?.[participantId])
-    .map((frame: any) => {
+    .filter((frame: { participantFrames?: Record<number, unknown> }) => {
+      return frame.participantFrames !== undefined && typeof participantId === 'number' && participantId in frame.participantFrames;
+    })
+    .map((frame: { timestamp: number; participantFrames?: Record<number, { gold?: number; xp?: number; damageStats?: { totalDamageDoneToChampions?: number }; minionsKilled?: number; level?: number }> }) => {
+      if (!frame.participantFrames || typeof participantId !== 'number') {
+        return null;
+      }
       const participantFrame = frame.participantFrames[participantId];
+      if (!participantFrame) {
+        return null;
+      }
       const timestamp = frame.timestamp;
       const minutes = Math.floor(timestamp / 60000);
       const seconds = Math.floor((timestamp % 60000) / 1000);
       
       return {
         timestamp,
-        gold: participantFrame.currentGold || 0,
+        gold: participantFrame.gold || 0,
         xp: participantFrame.xp || 0,
         damage: participantFrame.damageStats?.totalDamageDoneToChampions || 0,
         cs: participantFrame.minionsKilled || 0,
         level: participantFrame.level || 1,
         time: `${minutes}:${seconds.toString().padStart(2, '0')}`
       };
-    });
+    })
+    .filter((point): point is TimelineDataPoint => point !== null);
 
   if (data.length === 0) {
     return (
@@ -121,10 +144,12 @@ export function MatchTimelineChart({ timeline, playerPuuid, teamId, className = 
                 borderRadius: '8px',
                 color: '#F9FAFB'
               }}
-              formatter={(value: any, name: string) => {
-                const formattedValue = typeof value === 'number' 
+              formatter={(value: unknown, name: string): [React.ReactNode, string] => {
+                const formattedValue: React.ReactNode = typeof value === 'number' 
                   ? value.toLocaleString() 
-                  : value;
+                  : typeof value === 'string'
+                  ? value
+                  : String(value);
                 return [formattedValue, name];
               }}
               labelStyle={{ color: '#F9FAFB' }}

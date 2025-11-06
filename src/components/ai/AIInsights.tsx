@@ -6,9 +6,17 @@ import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Brain, Sparkles, TrendingUp, Loader2, Share2, Copy } from 'lucide-react';
 
+interface MatchData {
+  [key: string]: unknown;
+}
+
+interface PlayerStats {
+  [key: string]: unknown;
+}
+
 interface AIInsightsProps {
-  matchData: any[];
-  playerStats: any;
+  matchData: MatchData[];
+  playerStats: PlayerStats;
   gameName: string;
   tagLine: string;
 }
@@ -57,9 +65,10 @@ export function AIInsights({ matchData, playerStats, gameName, tagLine }: AIInsi
       } else {
         setImprovements(data.insights);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('AI analysis error:', error);
-      setError(error.message || 'Failed to generate AI insights. Please check your backend connection and Bedrock Lambda configuration.');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to generate AI insights. Please check your backend connection and Bedrock Lambda configuration.';
+      setError(errorMessage);
     } finally {
       setLoading(null);
     }
@@ -77,7 +86,7 @@ export function AIInsights({ matchData, playerStats, gameName, tagLine }: AIInsi
           title: `${gameName}#${tagLine} - ${title}`,
           text: text.substring(0, 200) + '...'
         });
-      } catch (err) {
+      } catch {
         console.log('Share cancelled');
       }
     } else {

@@ -4,7 +4,23 @@ import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 interface ObjectiveTimelineProps {
-  match: any;
+  match: {
+    info?: {
+      participants?: Array<{ puuid: string; teamId: number; [key: string]: unknown }>;
+      gameDuration?: number;
+      gameStartTimestamp?: number;
+      teams?: Array<{
+        teamId: number;
+        objectives?: {
+          dragon?: { kills: number; first?: boolean };
+          baron?: { kills: number; first?: boolean };
+          riftHerald?: { kills: number; first?: boolean };
+          tower?: { kills: number; first?: boolean };
+          inhibitor?: { kills: number; first?: boolean };
+        };
+      }>;
+    };
+  };
   playerPuuid: string;
   className?: string;
 }
@@ -27,7 +43,7 @@ export function ObjectiveTimeline({ match, playerPuuid, className = '' }: Object
     );
   }
 
-  const participant = match.info.participants.find((p: any) => p.puuid === playerPuuid);
+  const participant = match.info.participants.find((p: { puuid: string }) => p.puuid === playerPuuid);
   if (!participant) {
     return (
       <div className={`p-4 text-center text-slate-400 ${className}`}>
@@ -37,72 +53,87 @@ export function ObjectiveTimeline({ match, playerPuuid, className = '' }: Object
   }
 
   const teamId = participant.teamId;
-  const gameDuration = match.info.gameDuration;
-  const gameStartTime = match.info.gameStartTimestamp;
+  const gameStartTime = match.info.gameStartTimestamp ?? 0;
+  const gameDuration = match.info.gameDuration ?? 0;
 
   // Extract objective events from match data
   const objectives: ObjectiveEvent[] = [];
 
   // Process team objectives
-  if (match.info.teams) {
-    match.info.teams.forEach((team: any) => {
+  if (match.info.teams && gameStartTime > 0) {
+    match.info.teams.forEach((team: { teamId: number; objectives?: { dragon?: { kills: number; first?: boolean }; baron?: { kills: number; first?: boolean }; riftHerald?: { kills: number; first?: boolean }; tower?: { kills: number; first?: boolean }; inhibitor?: { kills: number; first?: boolean } } }) => {
       const isPlayerTeam = team.teamId === teamId;
+      const teamObjectives = team.objectives;
       
       // Dragons
-      if (team.objectives?.dragon?.kills > 0) {
+      if (teamObjectives?.dragon && typeof teamObjectives.dragon.kills === 'number' && teamObjectives.dragon.kills > 0) {
+        const dragonKills = teamObjectives.dragon.kills;
+        const firstDragon = teamObjectives.dragon.first === true;
+        const timestamp = gameStartTime + (firstDragon ? 300000 : 0);
         objectives.push({
-          timestamp: gameStartTime + (team.objectives.dragon.first ? 300000 : 0), // Estimate timing
-          time: formatTime(gameStartTime + (team.objectives.dragon.first ? 300000 : 0), gameStartTime),
+          timestamp,
+          time: formatTime(timestamp, gameStartTime),
           type: 'dragon',
           team: team.teamId === 100 ? 'blue' : 'red',
           playerInvolved: isPlayerTeam,
-          description: `Dragon (${team.objectives.dragon.kills} kills)`
+          description: `Dragon (${dragonKills} kills)`
         });
       }
 
       // Baron
-      if (team.objectives?.baron?.kills > 0) {
+      if (teamObjectives?.baron && typeof teamObjectives.baron.kills === 'number' && teamObjectives.baron.kills > 0) {
+        const baronKills = teamObjectives.baron.kills;
+        const firstBaron = teamObjectives.baron.first === true;
+        const timestamp = gameStartTime + (firstBaron ? 1200000 : 0);
         objectives.push({
-          timestamp: gameStartTime + (team.objectives.baron.first ? 1200000 : 0), // Estimate timing
-          time: formatTime(gameStartTime + (team.objectives.baron.first ? 1200000 : 0), gameStartTime),
+          timestamp,
+          time: formatTime(timestamp, gameStartTime),
           type: 'baron',
           team: team.teamId === 100 ? 'blue' : 'red',
           playerInvolved: isPlayerTeam,
-          description: `Baron (${team.objectives.baron.kills} kills)`
+          description: `Baron (${baronKills} kills)`
         });
       }
 
       // Towers
-      if (team.objectives?.tower?.kills > 0) {
+      if (teamObjectives?.tower && typeof teamObjectives.tower.kills === 'number' && teamObjectives.tower.kills > 0) {
+        const towerKills = teamObjectives.tower.kills;
+        const firstTower = teamObjectives.tower.first === true;
+        const timestamp = gameStartTime + (firstTower ? 600000 : 0);
         objectives.push({
-          timestamp: gameStartTime + (team.objectives.tower.first ? 600000 : 0), // Estimate timing
-          time: formatTime(gameStartTime + (team.objectives.tower.first ? 600000 : 0), gameStartTime),
+          timestamp,
+          time: formatTime(timestamp, gameStartTime),
           type: 'tower',
           team: team.teamId === 100 ? 'blue' : 'red',
           playerInvolved: isPlayerTeam,
-          description: `Towers (${team.objectives.tower.kills} destroyed)`
+          description: `Towers (${towerKills} destroyed)`
         });
       }
 
       // Inhibitors
-      if (team.objectives?.inhibitor?.kills > 0) {
+      if (teamObjectives?.inhibitor && typeof teamObjectives.inhibitor.kills === 'number' && teamObjectives.inhibitor.kills > 0) {
+        const inhibitorKills = teamObjectives.inhibitor.kills;
+        const firstInhibitor = teamObjectives.inhibitor.first === true;
+        const timestamp = gameStartTime + (firstInhibitor ? 900000 : 0);
         objectives.push({
-          timestamp: gameStartTime + (team.objectives.inhibitor.first ? 900000 : 0), // Estimate timing
-          time: formatTime(gameStartTime + (team.objectives.inhibitor.first ? 900000 : 0), gameStartTime),
+          timestamp,
+          time: formatTime(timestamp, gameStartTime),
           type: 'inhibitor',
           team: team.teamId === 100 ? 'blue' : 'red',
           playerInvolved: isPlayerTeam,
-          description: `Inhibitors (${team.objectives.inhibitor.kills} destroyed)`
+          description: `Inhibitors (${inhibitorKills} destroyed)`
         });
       }
     });
   }
 
   // Add player-specific objectives
-  if (participant.dragonKills > 0) {
+  const dragonKills = typeof participant.dragonKills === 'number' ? participant.dragonKills : 0;
+  if (dragonKills > 0 && gameStartTime > 0) {
+    const timestamp = gameStartTime + 300000;
     objectives.push({
-      timestamp: gameStartTime + 300000, // Estimate
-      time: formatTime(gameStartTime + 300000, gameStartTime),
+      timestamp,
+      time: formatTime(timestamp, gameStartTime),
       type: 'dragon',
       team: teamId === 100 ? 'blue' : 'red',
       playerInvolved: true,
@@ -110,10 +141,12 @@ export function ObjectiveTimeline({ match, playerPuuid, className = '' }: Object
     });
   }
 
-  if (participant.baronKills > 0) {
+  const baronKills = typeof participant.baronKills === 'number' ? participant.baronKills : 0;
+  if (baronKills > 0 && gameStartTime > 0) {
+    const timestamp = gameStartTime + 1200000;
     objectives.push({
-      timestamp: gameStartTime + 1200000, // Estimate
-      time: formatTime(gameStartTime + 1200000, gameStartTime),
+      timestamp,
+      time: formatTime(timestamp, gameStartTime),
       type: 'baron',
       team: teamId === 100 ? 'blue' : 'red',
       playerInvolved: true,
@@ -121,10 +154,12 @@ export function ObjectiveTimeline({ match, playerPuuid, className = '' }: Object
     });
   }
 
-  if (participant.turretKills > 0) {
+  const turretKills = typeof participant.turretKills === 'number' ? participant.turretKills : 0;
+  if (turretKills > 0 && gameStartTime > 0) {
+    const timestamp = gameStartTime + 600000;
     objectives.push({
-      timestamp: gameStartTime + 600000, // Estimate
-      time: formatTime(gameStartTime + 600000, gameStartTime),
+      timestamp,
+      time: formatTime(timestamp, gameStartTime),
       type: 'tower',
       team: teamId === 100 ? 'blue' : 'red',
       playerInvolved: true,
@@ -132,10 +167,12 @@ export function ObjectiveTimeline({ match, playerPuuid, className = '' }: Object
     });
   }
 
-  if (participant.inhibitorKills > 0) {
+  const inhibitorKills = typeof participant.inhibitorKills === 'number' ? participant.inhibitorKills : 0;
+  if (inhibitorKills > 0 && gameStartTime > 0) {
+    const timestamp = gameStartTime + 900000;
     objectives.push({
-      timestamp: gameStartTime + 900000, // Estimate
-      time: formatTime(gameStartTime + 900000, gameStartTime),
+      timestamp,
+      time: formatTime(timestamp, gameStartTime),
       type: 'inhibitor',
       team: teamId === 100 ? 'blue' : 'red',
       playerInvolved: true,
@@ -147,7 +184,7 @@ export function ObjectiveTimeline({ match, playerPuuid, className = '' }: Object
   objectives.sort((a, b) => a.timestamp - b.timestamp);
 
   // Create chart data
-  const chartData = objectives.map((obj, index) => ({
+  const chartData = objectives.map((obj) => ({
     time: obj.time,
     type: obj.type,
     team: obj.team,

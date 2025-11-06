@@ -4,10 +4,10 @@ const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { gameName: string; tagLine: string } }
+  context: { params: Promise<{ gameName: string; tagLine: string }> }
 ) {
   try {
-    const { gameName, tagLine } = params;
+    const { gameName, tagLine } = await context.params;
     const { searchParams } = new URL(request.url);
     const region = searchParams.get('region') || 'americas';
     
@@ -44,10 +44,11 @@ export async function GET(
     
     const challenges = await challengeResponse.json();
     return NextResponse.json(challenges);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API Route] Error fetching challenges:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch challenge data';
     return NextResponse.json(
-      { message: error.message || 'Failed to fetch challenge data' },
+      { message: errorMessage },
       { status: 500 }
     );
   }

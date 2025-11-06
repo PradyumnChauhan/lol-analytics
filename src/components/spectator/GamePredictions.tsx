@@ -2,14 +2,10 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { 
   TrendingUp, 
   Target, 
-  BarChart3, 
-  Zap, 
   Users, 
-  Trophy,
   AlertTriangle,
   CheckCircle
 } from 'lucide-react';
@@ -81,7 +77,6 @@ export function GamePredictions({
   playerPuuid 
 }: GamePredictionsProps) {
   const playerParticipant = liveGameData.participants.find(p => p.puuid === playerPuuid);
-  const isPlayerBlueTeam = playerParticipant?.teamId === 100;
 
   // Calculate team compositions and strengths
   const getTeamAnalysis = (team: LiveGameParticipant[]) => {

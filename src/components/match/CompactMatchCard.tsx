@@ -3,7 +3,7 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Clock, Eye, Target, Zap, Shield, Sword, ChevronRight } from 'lucide-react';
+import { Clock, Eye, Target, Sword, ChevronRight } from 'lucide-react';
 
 interface MatchParticipant {
   puuid: string;
@@ -146,7 +146,8 @@ export function CompactMatchCard({ match, participant, onMatchClick, className =
             {/* Champion */}
             <div className="relative">
               <div className="w-8 h-8 rounded overflow-hidden border border-white/20">
-                <img 
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img 
                   src={`https://ddragon.leagueoflegends.com/cdn/14.19.1/img/champion/${participant.championName || 'Aatrox'}.png`}
                   alt={participant.championName || `Champion ${participant.championId}`}
                   className="w-full h-full object-cover"
@@ -230,15 +231,18 @@ export function CompactMatchCard({ match, participant, onMatchClick, className =
               {[participant.item0, participant.item1, participant.item2, participant.item3, participant.item4, participant.item5].map((itemId, index) => (
                 <div key={index} className={`w-4 h-4 rounded border ${itemId ? 'bg-slate-600 border-slate-500' : 'bg-slate-800 border-slate-700'}`}>
                   {itemId ? (
-                    <img 
-                      src={`https://ddragon.leagueoflegends.com/cdn/14.19.1/img/item/${itemId}.png`}
-                      alt={`Item ${itemId}`}
-                      className="w-full h-full rounded object-cover"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.style.display = 'none';
-                      }}
-                    />
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img 
+                        src={`https://ddragon.leagueoflegends.com/cdn/14.19.1/img/item/${itemId}.png`}
+                        alt={`Item ${itemId}`}
+                        className="w-full h-full rounded object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                        }}
+                      />
+                    </>
                   ) : null}
                 </div>
               ))}
@@ -331,7 +335,6 @@ export function CompactMatchCardMobile({ match, participant, onMatchClick, class
   const isWin = participant.win;
   const gameDuration = match.info.gameDuration;
   const gameCreation = match.info.gameCreation;
-  const queueId = match.info.queueId || 420;
   const performanceGrade = getPerformanceGrade(participant);
   
   const kda = participant.deaths > 0 ? (participant.kills + participant.assists) / participant.deaths : participant.kills + participant.assists;
@@ -354,6 +357,7 @@ export function CompactMatchCardMobile({ match, participant, onMatchClick, class
             </div>
             
             <div className="w-8 h-8 rounded overflow-hidden border border-white/30">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img 
                 src={`https://ddragon.leagueoflegends.com/cdn/14.19.1/img/champion/${participant.championName || 'Aatrox'}.png`}
                 alt={participant.championName || `Champion ${participant.championId}`}

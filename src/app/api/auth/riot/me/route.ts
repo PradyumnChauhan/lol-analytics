@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
 const regions = ['americas', 'europe', 'asia'];
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const cookieStore = await cookies();
     const accessToken = cookieStore.get('riot_access_token')?.value;
@@ -40,10 +40,11 @@ export async function GET(request: NextRequest) {
       { error: 'Failed to fetch account information' },
       { status: 500 }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[RSO] Error fetching user info:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: errorMessage },
       { status: 500 }
     );
   }

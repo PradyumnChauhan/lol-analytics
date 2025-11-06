@@ -113,6 +113,7 @@ export function TeamComposition({
                 {/* Champion Image */}
                 <div className="relative flex-shrink-0">
                   <div className="w-12 h-12 bg-gradient-to-br from-slate-600 to-slate-700 rounded-lg flex items-center justify-center">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img 
                       src={`https://ddragon.leagueoflegends.com/cdn/14.19.1/img/champion/Champion${participant.championId}.png`}
                       alt={`Champion ${participant.championId}`}
@@ -166,7 +167,8 @@ export function TeamComposition({
                     const spell = getSummonerSpell(spellId);
                     return (
                       <div key={spellIndex} className="w-6 h-6 bg-slate-700 rounded border border-slate-600">
-                        <img 
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img 
                           src={`https://ddragon.leagueoflegends.com/cdn/14.19.1/img/spell/${spell.icon}.png`}
                           alt={spell.name}
                           className="w-full h-full rounded"
@@ -201,6 +203,7 @@ export function TeamComposition({
                 .map((ban, index) => (
                 <div key={index} className="relative">
                   <div className="w-8 h-8 bg-slate-700 rounded border border-red-500/50">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img 
                       src={`https://ddragon.leagueoflegends.com/cdn/14.19.1/img/champion/Champion${ban.championId}.png`}
                       alt={`Banned Champion ${ban.championId}`}

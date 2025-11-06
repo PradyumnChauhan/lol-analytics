@@ -247,7 +247,9 @@ export class ChallengeUtils {
    * Calculate total challenge points across all categories
    */
   static calculateTotalPoints(categoryPoints: ChallengePlayerData['categoryPoints']): number {
-    return Object.values(categoryPoints).reduce((total, category) => total + category.current, 0);
+    return Object.values(categoryPoints).reduce((total, category) => {
+      return total + (category?.current ?? 0);
+    }, 0);
   }
 
   /**

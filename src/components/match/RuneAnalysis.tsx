@@ -3,7 +3,22 @@
 import React from 'react';
 
 interface RuneAnalysisProps {
-  participant: any;
+  participant: {
+    perks?: {
+      styles?: Array<{
+        style?: number;
+        selections?: Array<{
+          perk?: number;
+        }>;
+      }>;
+      statPerks?: {
+        defense?: number;
+        flex?: number;
+        offense?: number;
+      };
+    };
+    [key: string]: unknown;
+  };
   className?: string;
 }
 
@@ -43,7 +58,7 @@ export function RuneAnalysis({ participant, className = '' }: RuneAnalysisProps)
         <div className="bg-white/5 rounded-lg p-4">
           <div className="flex items-center space-x-4 mb-3">
             <div className="w-12 h-12 bg-slate-700 rounded-lg flex items-center justify-center">
-              <span className="text-2xl">{getRuneIcon(primaryRunes.keystone?.id)}</span>
+              <span className="text-2xl">{getRuneIcon(primaryRunes.keystone?.id ?? 0)}</span>
             </div>
             <div>
               <div className="text-white font-semibold">{primaryRunes.keystone?.name || 'Unknown'}</div>
@@ -138,7 +153,7 @@ export function RuneAnalysis({ participant, className = '' }: RuneAnalysisProps)
   );
 }
 
-function extractPrimaryRunes(participant: any): {
+function extractPrimaryRunes(participant: { perks?: { styles?: Array<{ style?: number; selections?: Array<{ perk?: number }> }> } }): {
   keystone: RuneData | null;
   path: string;
   slots: RuneData[];
@@ -150,29 +165,32 @@ function extractPrimaryRunes(participant: any): {
   }
 
   const keystone = perks.styles?.[0]?.selections?.[0]?.perk;
-  const path = perks.styles?.[0]?.style || 'Unknown';
-  const slots = perks.styles?.[0]?.selections?.slice(1)?.map((selection: any) => ({
-    id: selection.perk,
-    name: getRuneName(selection.perk),
-    description: '',
-    icon: '',
-    tier: 'primary' as const
-  })) || [];
+  const path = perks.styles?.[0]?.style;
+  const slots = perks.styles?.[0]?.selections?.slice(1)?.map((selection: { perk?: number }) => {
+    const perkId = typeof selection.perk === 'number' ? selection.perk : 0;
+    return {
+      id: perkId,
+      name: getRuneName(perkId),
+      description: '',
+      icon: '',
+      tier: 'primary' as const
+    };
+  }).filter(rune => rune.id > 0) || [];
 
   return {
-    keystone: keystone ? {
+    keystone: typeof keystone === 'number' && keystone > 0 ? {
       id: keystone,
       name: getRuneName(keystone),
       description: '',
       icon: '',
       tier: 'primary'
     } : null,
-    path: getRunePathName(path),
+    path: typeof path === 'number' ? getRunePathName(path) : 'Unknown',
     slots
   };
 }
 
-function extractSecondaryRunes(participant: any): {
+function extractSecondaryRunes(participant: { perks?: { styles?: Array<{ style?: number; selections?: Array<{ perk?: number }> }> } }): {
   path: string;
   pathId: number;
   slots: RuneData[];
@@ -182,52 +200,59 @@ function extractSecondaryRunes(participant: any): {
     return { path: 'Unknown', pathId: 0, slots: [] };
   }
 
-  const pathId = perks.styles[1].style;
-  const path = getRunePathName(pathId);
-  const slots = perks.styles[1].selections?.map((selection: any) => ({
-    id: selection.perk,
-    name: getRuneName(selection.perk),
-    description: '',
-    icon: '',
-    tier: 'secondary' as const
-  })) || [];
+  const pathId = typeof perks.styles[1].style === 'number' ? perks.styles[1].style : 0;
+  const path = pathId > 0 ? getRunePathName(pathId) : 'Unknown';
+  const slots = perks.styles[1].selections?.map((selection: { perk?: number }) => {
+    const perkId = typeof selection.perk === 'number' ? selection.perk : 0;
+    return {
+      id: perkId,
+      name: getRuneName(perkId),
+      description: '',
+      icon: '',
+      tier: 'secondary' as const
+    };
+  }).filter(rune => rune.id > 0) || [];
 
   return { path, pathId, slots };
 }
 
-function extractStatRunes(participant: any): RuneData[] {
+function extractStatRunes(participant: { perks?: { statPerks?: { defense?: number; flex?: number; offense?: number } } }): RuneData[] {
   const perks = participant.perks;
   if (!perks || !perks.statPerks) {
     return [];
   }
 
   const statPerks = perks.statPerks;
+  const defense = typeof statPerks.defense === 'number' ? statPerks.defense : 0;
+  const flex = typeof statPerks.flex === 'number' ? statPerks.flex : 0;
+  const offense = typeof statPerks.offense === 'number' ? statPerks.offense : 0;
   return [
     {
-      id: statPerks.defense || 0,
-      name: getStatRuneName(statPerks.defense),
-      description: getStatRuneDescription(statPerks.defense),
+      id: defense,
+      name: getStatRuneName(defense),
+      description: getStatRuneDescription(defense),
       icon: '',
-      tier: 'stat'
+      tier: 'stat' as const
     },
     {
-      id: statPerks.flex || 0,
-      name: getStatRuneName(statPerks.flex),
-      description: getStatRuneDescription(statPerks.flex),
+      id: flex,
+      name: getStatRuneName(flex),
+      description: getStatRuneDescription(flex),
       icon: '',
-      tier: 'stat'
+      tier: 'stat' as const
     },
     {
-      id: statPerks.offense || 0,
-      name: getStatRuneName(statPerks.offense),
-      description: getStatRuneDescription(statPerks.offense),
+      id: offense,
+      name: getStatRuneName(offense),
+      description: getStatRuneDescription(offense),
       icon: '',
-      tier: 'stat'
+      tier: 'stat' as const
     }
   ].filter(stat => stat.id > 0);
 }
 
-function getRuneName(runeId: number): string {
+function getRuneName(runeId: number | undefined): string {
+  if (typeof runeId !== 'number' || runeId <= 0) return 'Unknown';
   // This would ideally use a static data file
   const runeNames: Record<number, string> = {
     8000: 'Precision',
@@ -241,7 +266,8 @@ function getRuneName(runeId: number): string {
   return runeNames[runeId] || `Rune ${runeId}`;
 }
 
-function getRunePathName(pathId: number): string {
+function getRunePathName(pathId: number | string | undefined): string {
+  if (typeof pathId !== 'number' || pathId <= 0) return 'Unknown';
   const pathNames: Record<number, string> = {
     8000: 'Precision',
     8100: 'Domination',
@@ -266,7 +292,8 @@ function getRuneIcon(runeId: number): string {
   return icons[runeId] || '❓';
 }
 
-function getStatRuneName(statId: number): string {
+function getStatRuneName(statId: number | undefined): string {
+  if (typeof statId !== 'number' || statId <= 0) return 'Unknown';
   const statNames: Record<number, string> = {
     5001: '+9 Adaptive Force',
     5002: '+9 Adaptive Force',
@@ -279,7 +306,8 @@ function getStatRuneName(statId: number): string {
   return statNames[statId] || `Stat ${statId}`;
 }
 
-function getStatRuneDescription(statId: number): string {
+function getStatRuneDescription(statId: number | undefined): string {
+  if (typeof statId !== 'number' || statId <= 0) return '';
   const descriptions: Record<number, string> = {
     5001: 'Adaptive Force',
     5002: 'Adaptive Force',
@@ -292,7 +320,8 @@ function getStatRuneDescription(statId: number): string {
   return descriptions[statId] || '';
 }
 
-function getStatIcon(statId: number): string {
+function getStatIcon(statId: number | undefined): string {
+  if (typeof statId !== 'number' || statId <= 0) return '❓';
   const icons: Record<number, string> = {
     5001: '⚔️',
     5002: '⚔️',

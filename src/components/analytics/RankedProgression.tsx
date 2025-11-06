@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TrendingUp, Crown, Target } from 'lucide-react';
 
@@ -36,7 +35,7 @@ export function RankedProgression({ leagueData }: RankedProgressionProps) {
       return total === 0 ? 0 : (wins / total) * 100;
     };
 
-    const getTierProgress = (tier: string, rank: string, lp: number) => {
+    const getTierProgress = (tier: string, rank: string) => {
       const tierOrder = ['IRON', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'EMERALD', 'DIAMOND', 'MASTER', 'GRANDMASTER', 'CHALLENGER'];
       const rankOrder = ['IV', 'III', 'II', 'I'];
       
@@ -59,13 +58,13 @@ export function RankedProgression({ leagueData }: RankedProgressionProps) {
       soloQueue: soloQueue ? {
         ...soloQueue,
         winRate: calculateWinRate(soloQueue.wins, soloQueue.losses),
-        progress: getTierProgress(soloQueue.tier, soloQueue.rank, soloQueue.leaguePoints),
+        progress: getTierProgress(soloQueue.tier, soloQueue.rank),
         totalGames: soloQueue.wins + soloQueue.losses
       } : null,
       flexQueue: flexQueue ? {
         ...flexQueue,
         winRate: calculateWinRate(flexQueue.wins, flexQueue.losses),
-        progress: getTierProgress(flexQueue.tier, flexQueue.rank, flexQueue.leaguePoints),
+        progress: getTierProgress(flexQueue.tier, flexQueue.rank),
         totalGames: flexQueue.wins + flexQueue.losses
       } : null
     };

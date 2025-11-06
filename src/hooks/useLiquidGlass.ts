@@ -40,7 +40,7 @@ const defaultConfig: Required<LiquidGlassConfig> = {
 };
 
 export interface LiquidGlassReturn {
-  ref: React.RefObject<HTMLDivElement>;
+  ref: React.RefObject<HTMLDivElement | null>;
   filterId: string;
   style: React.CSSProperties;
   className: string;

@@ -1,8 +1,8 @@
 'use client';
 
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Clock, Award, Target, Zap } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Clock, Award, Target } from 'lucide-react';
 
 interface Match {
   metadata: {
@@ -54,6 +54,16 @@ interface DetailedMatchHistoryProps {
   puuid: string;
 }
 
+interface Participant {
+  kills: number;
+  deaths: number;
+  assists: number;
+  totalDamageDealtToChampions: number;
+  visionScore: number;
+  goldEarned: number;
+  [key: string]: unknown;
+}
+
 export function DetailedMatchHistory({ matches, puuid }: DetailedMatchHistoryProps) {
   const getQueueName = (queueId: number) => {
     const queues: Record<number, string> = {
@@ -81,13 +91,14 @@ export function DetailedMatchHistory({ matches, puuid }: DetailedMatchHistoryPro
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  const getPerformanceScore = (participant: any) => {
+  const getPerformanceScore = (participant: Participant) => {
     const kda = participant.deaths === 0 ? 
       participant.kills + participant.assists : 
       (participant.kills + participant.assists) / participant.deaths;
     
     const damageRatio = participant.totalDamageDealtToChampions / Math.max(participant.goldEarned, 1);
-    const csPerMin = participant.totalMinionsKilled / (15); // Assuming 15 min average
+    const totalMinionsKilled = typeof participant.totalMinionsKilled === 'number' ? participant.totalMinionsKilled : 0;
+    const csPerMin = totalMinionsKilled / (15); // Assuming 15 min average
     
     return Math.round((kda * 20) + (damageRatio * 1000) + (csPerMin * 2) + (participant.visionScore * 3));
   };

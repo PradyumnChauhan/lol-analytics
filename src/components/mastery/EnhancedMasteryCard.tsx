@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Crown, Award, Clock, Calendar, CheckCircle, AlertCircle } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CheckCircle, AlertCircle } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { MasteryProgressBar } from './MasteryProgressBar';
 
@@ -24,16 +24,6 @@ interface EnhancedMasteryCardProps {
   rank?: number;
 }
 
-const MASTERY_LEVEL_COLORS = {
-  1: 'text-gray-400',
-  2: 'text-gray-300',
-  3: 'text-green-400',
-  4: 'text-blue-400',
-  5: 'text-purple-400',
-  6: 'text-red-400',
-  7: 'text-yellow-400'
-};
-
 const MASTERY_LEVEL_NAMES = {
   1: 'D',
   2: 'C',
@@ -44,7 +34,7 @@ const MASTERY_LEVEL_NAMES = {
   7: 'S++' 
 };
 
-const POINTS_FOR_NEXT_LEVEL = {
+const _POINTS_FOR_NEXT_LEVEL = {
   1: 1800,
   2: 4200, 
   3: 8400,
@@ -107,6 +97,7 @@ export function EnhancedMasteryCard({ mastery, championName, rank }: EnhancedMas
           {/* Champion Image */}
           <div className="relative flex-shrink-0">
             <div className="w-16 h-16 bg-gradient-to-br from-slate-600 to-slate-700 rounded-xl flex items-center justify-center border-2 border-white/20">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img 
                 src={`https://ddragon.leagueoflegends.com/cdn/14.19.1/img/champion/${championName || 'Aatrox'}.png`}
                 alt={championName || `Champion ${mastery.championId}`}
@@ -147,9 +138,13 @@ export function EnhancedMasteryCard({ mastery, championName, rank }: EnhancedMas
               {/* Rewards Status */}
               <div className="flex items-center space-x-1">
                 {mastery.chestGranted ? (
-                  <CheckCircle className="h-4 w-4 text-green-400" title="Chest Earned" />
+                  <div title="Chest Earned">
+                    <CheckCircle className="h-4 w-4 text-green-400" />
+                  </div>
                 ) : (
-                  <AlertCircle className="h-4 w-4 text-yellow-400" title="Chest Available" />
+                  <div title="Chest Available">
+                    <AlertCircle className="h-4 w-4 text-yellow-400" />
+                  </div>
                 )}
                 {mastery.tokensEarned > 0 && (
                   <Badge variant="secondary" className="text-xs bg-blue-500/20 text-blue-400">

@@ -1,7 +1,7 @@
 'use client';
 
 import { Card } from '@/components/ui/card';
-import { TrendingUp, CheckCircle2 } from 'lucide-react';
+import { TrendingUp } from 'lucide-react';
 
 interface ImprovementRoadmapProps {
   roadmap: string;

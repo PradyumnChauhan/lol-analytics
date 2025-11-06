@@ -3,7 +3,7 @@
  * Main component for displaying tournament schedule and upcoming Clash events
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,6 @@ import {
   Calendar, 
   Clock, 
   Users, 
-  Star,
   Award,
   Sword,
   Crown,
@@ -23,10 +22,8 @@ import {
   Timer
 } from 'lucide-react';
 import { 
-  Tournament,
   TournamentWithStatus,
   ClashUtils,
-  TOURNAMENT_THEMES,
   clashAPI
 } from '@/lib/api/endpoints/clash';
 
@@ -36,14 +33,14 @@ interface TournamentHubProps {
   isLoading?: boolean;
 }
 
-export function TournamentHub({ playerPuuid, region = 'na1', isLoading }: TournamentHubProps) {
+export function TournamentHub({ playerPuuid: _playerPuuid, region = 'na1', isLoading }: TournamentHubProps) {
   const [tournaments, setTournaments] = useState<TournamentWithStatus[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<number>(0);
   const [selectedTournament, setSelectedTournament] = useState<TournamentWithStatus | null>(null);
 
-  const loadTournaments = async () => {
+  const loadTournaments = useCallback(async () => {
     if (loading) return;
     
     setLoading(true);
@@ -74,7 +71,7 @@ export function TournamentHub({ playerPuuid, region = 'na1', isLoading }: Tourna
     } finally {
       setLoading(false);
     }
-  };
+  }, [region, loading]);
 
   useEffect(() => {
     loadTournaments();
@@ -82,7 +79,7 @@ export function TournamentHub({ playerPuuid, region = 'na1', isLoading }: Tourna
     // Auto-refresh every 5 minutes
     const interval = setInterval(loadTournaments, 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [region]);
+  }, [loadTournaments]);
 
   const getStatusIcon = (status: TournamentWithStatus['status']) => {
     switch (status) {

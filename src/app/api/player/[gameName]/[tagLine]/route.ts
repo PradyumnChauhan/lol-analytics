@@ -4,10 +4,10 @@ const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { gameName: string; tagLine: string } }
+  context: { params: Promise<{ gameName: string; tagLine: string }> }
 ) {
   try {
-    const { gameName, tagLine } = params;
+    const { gameName, tagLine } = await context.params;
     const { searchParams } = new URL(request.url);
     const region = searchParams.get('region') || 'americas';
     
@@ -72,7 +72,7 @@ export async function GET(
       if (challengeResponse.ok) {
         challenges = await challengeResponse.json();
       }
-    } catch (error) {
+    } catch {
       // Challenges not available
     }
 
@@ -84,7 +84,7 @@ export async function GET(
           `${BASE_URL}/api/clash/v1/players/by-summoner/${summoner.id}?region=${platform}`
         );
         if (clashResponse.ok) {
-          const clashData = await clashResponse.json();
+          await clashResponse.json(); // clashData not used
           // If we get clash data, also fetch tournaments
           const tournamentsResponse = await fetch(
             `${BASE_URL}/api/clash/v1/tournaments?region=${platform}`
@@ -94,7 +94,7 @@ export async function GET(
           }
         }
       }
-    } catch (error) {
+    } catch {
       // Clash data not available
     }
 
@@ -108,10 +108,11 @@ export async function GET(
       clash,
       region: platform,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API Route] Error fetching player data:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch player data';
     return NextResponse.json(
-      { message: error.message || 'Failed to fetch player data' },
+      { message: errorMessage },
       { status: 500 }
     );
   }

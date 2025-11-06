@@ -47,6 +47,7 @@ export function AdvancedAnalyticsDashboard({
       setLoading(true);
       
       // Generate ML insights
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const playerInsights = await advancedAnalyticsEngine.generatePlayerInsights(puuid, matches as any[]);
       setInsights(playerInsights);
       

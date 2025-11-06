@@ -3,7 +3,7 @@
  * Component for team management interface with player registration and role assignment
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,23 +12,18 @@ import {
   Users, 
   Crown, 
   Shield, 
-  Sword, 
-  Star,
   Settings,
   UserPlus,
   Search,
   Check,
   X,
   AlertCircle,
-  RefreshCw,
   Trophy,
   Target,
-  Award,
-  Zap
+  Award
 } from 'lucide-react';
 import { 
   ClashTeam,
-  ClashPlayer,
   TournamentPosition,
   ClashUtils,
   clashAPI
@@ -75,7 +70,7 @@ const TIER_COLORS = {
 export function TeamRegistration({ 
   playerPuuid, 
   region = 'na1', 
-  tournamentId,
+  tournamentId: _tournamentId,
   onTeamCreated,
   onTeamJoined 
 }: TeamRegistrationProps) {
@@ -92,7 +87,7 @@ export function TeamRegistration({
     iconColorId: 1
   });
 
-  const loadUserTeams = async () => {
+  const loadUserTeams = useCallback(async () => {
     if (!playerPuuid) return;
     
     setLoading(true);
@@ -108,7 +103,7 @@ export function TeamRegistration({
     } finally {
       setLoading(false);
     }
-  };
+  }, [playerPuuid, region]);
 
   const searchTeams = async (query: string) => {
     if (!query.trim()) {
@@ -121,11 +116,11 @@ export function TeamRegistration({
       const mockTeams: ClashTeam[] = [
         {
           id: 'mock-team-1',
+          tournamentId: 1,
           name: 'Dragon Slayers',
           abbreviation: 'DRAG',
           iconId: 1,
-          iconColorId: 2,
-          tier: 'II' as const,
+          tier: 2,
           captain: 'captain-puuid',
           players: [
             {
@@ -220,7 +215,7 @@ export function TeamRegistration({
 
   useEffect(() => {
     loadUserTeams();
-  }, [playerPuuid, region]);
+  }, [loadUserTeams]);
 
   useEffect(() => {
     const debounceTimer = setTimeout(() => {

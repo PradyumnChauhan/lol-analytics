@@ -3,12 +3,14 @@
 import { Card } from '@/components/ui/card';
 import { Brain, TrendingUp, Target, Award, Sparkles } from 'lucide-react';
 
+import type { AIDataPayload } from '@/lib/ai/data-aggregator';
+
 interface AIDashboardInsightsProps {
   insights: string;
-  aggregatedData: any;
+  aggregatedData?: AIDataPayload;
 }
 
-export function AIDashboardInsights({ insights, aggregatedData }: AIDashboardInsightsProps) {
+export function AIDashboardInsights({ insights }: AIDashboardInsightsProps) {
   // Parse insights into structured sections
   const parseInsights = (text: string) => {
     const sections: Record<string, string> = {};

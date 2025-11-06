@@ -27,10 +27,24 @@ interface ChampionTierListProps {
   className?: string;
 }
 
+interface ChampionTierData {
+  championId: number;
+  championName: string;
+  games: number;
+  wins: number;
+  winRate: number;
+  avgKDA: number;
+  avgDamage: number;
+  avgVision: number;
+  recentForm: boolean[];
+  tierScore: number;
+  [key: string]: unknown;
+}
+
 interface TierGroup {
   tier: string;
   color: string;
-  champions: any[];
+  champions: ChampionTierData[];
   minGames: number;
 }
 
@@ -47,10 +61,34 @@ export function ChampionTierList({ championStats, className = '' }: ChampionTier
   const minGames = 3;
   const filteredChampions = championStats
     .filter(champ => champ.games >= minGames)
-    .map(champ => ({
-      ...champ,
-      tierScore: calculateTierScore(champ)
-    }))
+    .map(champ => {
+      const tierData: ChampionTierData = {
+        championId: champ.championId,
+        championName: champ.championName,
+        games: champ.games,
+        wins: champ.wins,
+        winRate: champ.winRate,
+        avgKDA: champ.avgKDA,
+        avgDamage: champ.avgDamage,
+        avgVision: champ.avgVision,
+        recentForm: champ.recentForm,
+        tierScore: calculateTierScore({
+          ...champ,
+          tierScore: 0
+        }),
+        multikills: typeof champ.multikills === 'number' ? champ.multikills : 0,
+        killParticipation: typeof champ.killParticipation === 'number' ? champ.killParticipation : 0,
+        damageShare: typeof champ.damageShare === 'number' ? champ.damageShare : 0,
+        avgGold: typeof champ.avgGold === 'number' ? champ.avgGold : 0,
+        avgCS: typeof champ.avgCS === 'number' ? champ.avgCS : 0,
+        firstBloodRate: typeof champ.firstBloodRate === 'number' ? champ.firstBloodRate : 0,
+        goldShare: typeof champ.goldShare === 'number' ? champ.goldShare : 0,
+        performanceGrade: champ.performanceGrade,
+        roles: Array.isArray(champ.roles) ? champ.roles : [],
+        lastPlayed: champ.lastPlayed
+      };
+      return tierData;
+    })
     .sort((a, b) => b.tierScore - a.tierScore);
 
   // Group champions into tiers
@@ -64,7 +102,7 @@ export function ChampionTierList({ championStats, className = '' }: ChampionTier
       </h3>
       
       <div className="space-y-1">
-        {tierGroups.map((group, groupIndex) => (
+        {tierGroups.map((group) => (
           <div key={group.tier} className="bg-white/5 rounded border border-yellow-500/10 p-1.5">
             <div className="flex items-center mb-1">
               <div 
@@ -78,7 +116,7 @@ export function ChampionTierList({ championStats, className = '' }: ChampionTier
             </div>
             
             <div className="space-y-0.5">
-              {group.champions.map((champion, index) => (
+              {group.champions.map((champion) => (
                 <div
                   key={champion.championId}
                   className="bg-white/5 rounded border border-yellow-500/10 p-1.5 hover:bg-white/10 hover:border-yellow-500/30 transition-colors"
@@ -97,7 +135,7 @@ export function ChampionTierList({ championStats, className = '' }: ChampionTier
                         champion.performanceGrade === 'C' ? 'bg-orange-500 text-white' :
                         'bg-red-500 text-white'
                       }`}>
-                        {champion.performanceGrade}
+                        {typeof champion.performanceGrade === 'string' ? champion.performanceGrade : 'N/A'}
                       </div>
                     </div>
                     {/* Recent Form */}
@@ -143,49 +181,49 @@ export function ChampionTierList({ championStats, className = '' }: ChampionTier
                     </div>
                     
                     {/* Additional Stats */}
-                    {champion.multikills > 0 && (
+                    {typeof champion.multikills === 'number' && champion.multikills > 0 && (
                       <div className="flex flex-col">
                         <div className="text-white/60 text-[9px]">Multikills</div>
                         <div className="text-yellow-400 font-semibold text-xs">{champion.multikills}</div>
                       </div>
                     )}
-                    {champion.killParticipation > 0 && (
+                    {typeof champion.killParticipation === 'number' && champion.killParticipation > 0 && (
                       <div className="flex flex-col">
                         <div className="text-white/60 text-[9px]">KP</div>
                         <div className="text-white font-semibold text-xs">{champion.killParticipation.toFixed(0)}%</div>
                       </div>
                     )}
-                    {champion.damageShare > 0 && (
+                    {typeof champion.damageShare === 'number' && champion.damageShare > 0 && (
                       <div className="flex flex-col">
                         <div className="text-white/60 text-[9px]">Dmg Share</div>
                         <div className="text-white font-semibold text-xs">{champion.damageShare.toFixed(0)}%</div>
                       </div>
                     )}
-                    {champion.avgGold > 0 && (
+                    {typeof champion.avgGold === 'number' && champion.avgGold > 0 && (
                       <div className="flex flex-col">
                         <div className="text-white/60 text-[9px]">Gold</div>
                         <div className="text-white font-semibold text-xs">{(champion.avgGold / 1000).toFixed(1)}k</div>
                       </div>
                     )}
-                    {champion.avgVision > 0 && (
+                    {typeof champion.avgVision === 'number' && champion.avgVision > 0 && (
                       <div className="flex flex-col">
                         <div className="text-white/60 text-[9px]">Vision</div>
                         <div className="text-white font-semibold text-xs">{champion.avgVision.toFixed(0)}</div>
                       </div>
                     )}
-                    {champion.avgCS > 0 && (
+                    {typeof champion.avgCS === 'number' && champion.avgCS > 0 && (
                       <div className="flex flex-col">
                         <div className="text-white/60 text-[9px]">CS</div>
                         <div className="text-white font-semibold text-xs">{champion.avgCS.toFixed(0)}</div>
                       </div>
                     )}
-                    {champion.firstBloodRate > 0 && (
+                    {typeof champion.firstBloodRate === 'number' && champion.firstBloodRate > 0 && (
                       <div className="flex flex-col">
                         <div className="text-white/60 text-[9px]">FB Rate</div>
                         <div className="text-white font-semibold text-xs">{champion.firstBloodRate.toFixed(0)}%</div>
                       </div>
                     )}
-                    {champion.goldShare > 0 && (
+                    {typeof champion.goldShare === 'number' && champion.goldShare > 0 && (
                       <div className="flex flex-col">
                         <div className="text-white/60 text-[9px]">Gold %</div>
                         <div className="text-white font-semibold text-xs">{champion.goldShare.toFixed(0)}%</div>
@@ -194,11 +232,11 @@ export function ChampionTierList({ championStats, className = '' }: ChampionTier
                   </div>
                   
                   {/* Roles Footer */}
-                  {champion.roles && champion.roles.length > 0 && (
+                  {Array.isArray(champion.roles) && champion.roles.length > 0 && (
                     <div className="mt-1 pt-1 border-t border-yellow-500/10 flex items-center gap-1">
                       <div className="text-white/60 text-[9px]">Roles:</div>
                       <div className="flex flex-wrap gap-1">
-                        {Array.from(new Set(champion.roles as string[])).slice(0, 4).map((role: string, i: number) => (
+                        {Array.from(new Set(champion.roles.filter((r): r is string => typeof r === 'string'))).slice(0, 4).map((role: string, i: number) => (
                           <span
                             key={i}
                             className="px-1.5 py-0.5 bg-white/10 text-white/80 text-[9px] rounded border border-yellow-500/10"
@@ -249,7 +287,7 @@ export function ChampionTierList({ championStats, className = '' }: ChampionTier
   );
 }
 
-function calculateTierScore(champion: any): number {
+function calculateTierScore(champion: ChampionTierData): number {
   // Weighted scoring system
   const winRateScore = champion.winRate * 0.3;
   const kdaScore = Math.min(champion.avgKDA * 20, 30) * 0.25;
@@ -261,7 +299,7 @@ function calculateTierScore(champion: any): number {
   return winRateScore + kdaScore + damageScore + visionScore + gamesScore + recentFormScore;
 }
 
-function groupChampionsIntoTiers(champions: any[]): TierGroup[] {
+function groupChampionsIntoTiers(champions: ChampionTierData[]): TierGroup[] {
   if (champions.length === 0) return [];
 
   const sortedChampions = [...champions].sort((a, b) => b.tierScore - a.tierScore);

@@ -14,7 +14,6 @@ import {
   Home,
   Activity,
   Crown,
-  Brain,
   Database,
   Share2,
   Settings

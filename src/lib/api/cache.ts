@@ -2,7 +2,7 @@
 // Implements in-memory caching for API responses to improve performance
 
 interface CacheEntry {
-  data: any;
+  data: unknown;
   timestamp: number;
   ttl: number;
 }
@@ -11,11 +11,13 @@ class ApiCache {
   private cache: Map<string, CacheEntry> = new Map();
   private maxSize: number = 100; // Maximum number of cached entries
 
-  set(key: string, data: any, ttl: number = 3600000): void {
+  set(key: string, data: unknown, ttl: number = 3600000): void {
     // Remove oldest entries if cache is full
     if (this.cache.size >= this.maxSize) {
       const oldestKey = this.cache.keys().next().value;
-      this.cache.delete(oldestKey);
+      if (oldestKey) {
+        this.cache.delete(oldestKey);
+      }
     }
 
     this.cache.set(key, {
@@ -25,7 +27,7 @@ class ApiCache {
     });
   }
 
-  get(key: string): any | null {
+  get(key: string): unknown | null {
     const entry = this.cache.get(key);
     
     if (!entry) {
@@ -141,7 +143,7 @@ export const CACHE_TTL = {
 } as const;
 
 // Generate cache key for different types of requests
-export function generateCacheKey(type: string, params: Record<string, any>): string {
+export function generateCacheKey(type: string, params: Record<string, unknown>): string {
   const sortedParams = Object.keys(params)
     .sort()
     .map(key => `${key}:${params[key]}`)
@@ -167,7 +169,7 @@ export async function cachedFetch(
   options: RequestInit = {}, 
   cacheKey: string, 
   ttl: number = CACHE_TTL.MATCH_DETAILS
-): Promise<any> {
+): Promise<unknown> {
   // Check cache first
   const cached = apiCache.get(cacheKey);
   if (cached !== null) {

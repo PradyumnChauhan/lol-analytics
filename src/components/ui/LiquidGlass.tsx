@@ -73,7 +73,7 @@ export function LiquidGlass({
     if (isReady && ref.current && displacementMapURI) {
       injectBackdropFilter(ref.current, filterId);
     }
-  }, [isReady, filterId, displacementMapURI]);
+  }, [isReady, filterId, displacementMapURI, ref]);
 
   return (
     <>

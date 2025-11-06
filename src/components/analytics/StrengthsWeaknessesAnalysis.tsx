@@ -2,9 +2,41 @@
 
 import React from 'react';
 
+interface MatchParticipant {
+  puuid: string;
+  win: boolean;
+  kills: number;
+  deaths: number;
+  assists: number;
+  totalDamageDealtToChampions: number;
+  visionScore: number;
+  goldEarned: number;
+  totalMinionsKilled: number;
+  neutralMinionsKilled?: number;
+  teamDamagePercentage?: number;
+  wardsPlaced?: number;
+  wardsKilled?: number;
+  controlWardsPlaced?: number;
+  goldPerMinute?: number;
+  [key: string]: unknown;
+}
+
+interface MatchData {
+  info?: {
+    participants?: MatchParticipant[];
+  };
+  [key: string]: unknown;
+}
+
+interface ChampionStat {
+  winRate: number;
+  roles: string[];
+  [key: string]: unknown;
+}
+
 interface StrengthsWeaknessesAnalysisProps {
-  matchData: any[];
-  championStats: any[];
+  matchData: MatchData[];
+  championStats: ChampionStat[];
   playerPuuid: string;
   className?: string;
 }
@@ -117,13 +149,13 @@ export function StrengthsWeaknessesAnalysis({
 }
 
 function performStrengthsWeaknessesAnalysis(
-  matchData: any[], 
-  championStats: any[], 
+  matchData: MatchData[], 
+  championStats: ChampionStat[], 
   playerPuuid: string
 ): AnalysisItem[] {
   const playerMatches = matchData
-    .map(match => match.info?.participants?.find((p: any) => p.puuid === playerPuuid))
-    .filter(Boolean);
+    .map(match => match.info?.participants?.find((p: MatchParticipant) => p.puuid === playerPuuid))
+    .filter((p): p is MatchParticipant => Boolean(p));
 
   if (playerMatches.length === 0) return [];
 
@@ -141,7 +173,28 @@ function performStrengthsWeaknessesAnalysis(
   ];
 }
 
-function calculatePlayerMetrics(matches: any[]) {
+interface PlayerMetrics {
+  totalMatches: number;
+  wins: number;
+  winRate: number;
+  avgKills: number;
+  avgDeaths: number;
+  avgAssists: number;
+  avgKDA: number;
+  avgDamage: number;
+  avgDamageShare: number;
+  avgVisionScore: number;
+  avgWardsPlaced: number;
+  avgWardsKilled: number;
+  avgControlWards: number;
+  avgGold: number;
+  avgCS: number;
+  avgGoldShare: number;
+  kdaVariance: number;
+  damageVariance: number;
+}
+
+function calculatePlayerMetrics(matches: MatchParticipant[]): PlayerMetrics {
   const totalMatches = matches.length;
   const wins = matches.filter(m => m.win).length;
   const winRate = (wins / totalMatches) * 100;
@@ -191,7 +244,14 @@ function calculatePlayerMetrics(matches: any[]) {
   };
 }
 
-function calculateChampionMetrics(championStats: any[]) {
+interface ChampionMetrics {
+  totalChampions: number;
+  championsWithGoodWR: number;
+  avgWinRate: number;
+  roleDiversity: number;
+}
+
+function calculateChampionMetrics(championStats: ChampionStat[]): ChampionMetrics {
   const totalChampions = championStats.length;
   const championsWithGoodWR = championStats.filter(c => c.winRate >= 60).length;
   const avgWinRate = championStats.reduce((sum, c) => sum + c.winRate, 0) / totalChampions;
@@ -205,7 +265,7 @@ function calculateChampionMetrics(championStats: any[]) {
   };
 }
 
-function analyzeCombatPerformance(metrics: any): AnalysisItem {
+function analyzeCombatPerformance(metrics: PlayerMetrics): AnalysisItem {
   const kdaScore = Math.min(metrics.avgKDA * 20, 100);
   const damageScore = Math.min(metrics.avgDamage / 1000, 100);
   const score = (kdaScore + damageScore) / 2;
@@ -226,7 +286,7 @@ function analyzeCombatPerformance(metrics: any): AnalysisItem {
   };
 }
 
-function analyzeMapControl(metrics: any): AnalysisItem {
+function analyzeMapControl(metrics: PlayerMetrics): AnalysisItem {
   const visionScore = Math.min(metrics.avgVisionScore * 2, 100);
   const wardScore = Math.min((metrics.avgWardsPlaced + metrics.avgWardsKilled) * 5, 100);
   const score = (visionScore + wardScore) / 2;
@@ -247,7 +307,7 @@ function analyzeMapControl(metrics: any): AnalysisItem {
   };
 }
 
-function analyzeEconomy(metrics: any): AnalysisItem {
+function analyzeEconomy(metrics: PlayerMetrics): AnalysisItem {
   const goldScore = Math.min(metrics.avgGold / 100, 100);
   const csScore = Math.min(metrics.avgCS / 10, 100);
   const score = (goldScore + csScore) / 2;
@@ -268,7 +328,7 @@ function analyzeEconomy(metrics: any): AnalysisItem {
   };
 }
 
-function analyzeChampionMastery(championMetrics: any): AnalysisItem {
+function analyzeChampionMastery(championMetrics: ChampionMetrics): AnalysisItem {
   const championScore = Math.min((championMetrics.championsWithGoodWR / championMetrics.totalChampions) * 100, 100);
   const diversityScore = Math.min(championMetrics.roleDiversity * 20, 100);
   const score = (championScore + diversityScore) / 2;
@@ -289,7 +349,7 @@ function analyzeChampionMastery(championMetrics: any): AnalysisItem {
   };
 }
 
-function analyzeConsistency(metrics: any): AnalysisItem {
+function analyzeConsistency(metrics: PlayerMetrics): AnalysisItem {
   const kdaConsistency = Math.max(0, 100 - metrics.kdaVariance);
   const damageConsistency = Math.max(0, 100 - (metrics.damageVariance / 10000));
   const score = (kdaConsistency + damageConsistency) / 2;
@@ -310,7 +370,7 @@ function analyzeConsistency(metrics: any): AnalysisItem {
   };
 }
 
-function analyzeTeamPlay(metrics: any): AnalysisItem {
+function analyzeTeamPlay(metrics: PlayerMetrics): AnalysisItem {
   const winRateScore = metrics.winRate;
   const damageShareScore = Math.min(metrics.avgDamageShare * 100, 100);
   const score = (winRateScore + damageShareScore) / 2;

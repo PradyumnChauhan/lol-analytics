@@ -15,7 +15,7 @@ interface PerformanceGraphProps {
     performance: number;
     gamesPlayed: number;
   }>;
-  matchData?: any[];
+  matchData?: Array<Record<string, unknown>>;
   playerPuuid?: string;
   className?: string;
   type?: 'line' | 'area' | 'multi';
@@ -67,10 +67,12 @@ export function PerformanceGraph({ data, matchData, playerPuuid, className = '',
                 borderRadius: '8px',
                 color: '#F9FAFB'
               }}
-              formatter={(value: any, name: string) => {
-                const formattedValue = typeof value === 'number' 
+              formatter={(value: unknown, name: string): [React.ReactNode, string] => {
+                const formattedValue: React.ReactNode = typeof value === 'number' 
                   ? value.toFixed(1) 
-                  : value;
+                  : typeof value === 'string'
+                  ? value
+                  : String(value);
                 return [formattedValue, name];
               }}
               labelStyle={{ color: '#F9FAFB' }}
@@ -114,10 +116,12 @@ export function PerformanceGraph({ data, matchData, playerPuuid, className = '',
                 borderRadius: '8px',
                 color: '#F9FAFB'
               }}
-              formatter={(value: any, name: string) => {
-                const formattedValue = typeof value === 'number' 
+              formatter={(value: unknown, name: string): [React.ReactNode, string] => {
+                const formattedValue: React.ReactNode = typeof value === 'number' 
                   ? value.toFixed(1) 
-                  : value;
+                  : typeof value === 'string'
+                  ? value
+                  : String(value);
                 return [formattedValue, name];
               }}
               labelStyle={{ color: '#F9FAFB' }}
@@ -165,10 +169,12 @@ export function PerformanceGraph({ data, matchData, playerPuuid, className = '',
                 borderRadius: '8px',
                 color: '#F9FAFB'
               }}
-              formatter={(value: any, name: string) => {
-                const formattedValue = typeof value === 'number' 
+              formatter={(value: unknown, name: string): [React.ReactNode, string] => {
+                const formattedValue: React.ReactNode = typeof value === 'number' 
                   ? value.toFixed(1) 
-                  : value;
+                  : typeof value === 'string'
+                  ? value
+                  : String(value);
                 return [formattedValue, name];
               }}
               labelStyle={{ color: '#F9FAFB' }}
@@ -316,7 +322,13 @@ export function PerformanceGraph({ data, matchData, playerPuuid, className = '',
   );
 }
 
-function calculateTrends(data: any[]): {
+interface TrendDataPoint {
+  winRate?: number;
+  kda?: number;
+  [key: string]: unknown;
+}
+
+function calculateTrends(data: TrendDataPoint[]): {
   winRate: number;
   kda: number;
   damage: number;
@@ -329,8 +341,13 @@ function calculateTrends(data: any[]): {
   const firstHalf = data.slice(0, Math.floor(data.length / 2));
   const secondHalf = data.slice(Math.floor(data.length / 2));
 
-  const calculateAverage = (arr: any[], key: string) => 
-    arr.reduce((sum, item) => sum + item[key], 0) / arr.length;
+  const calculateAverage = (arr: TrendDataPoint[], key: string) => {
+    const sum = arr.reduce((acc, item) => {
+      const value = item[key];
+      return acc + (typeof value === 'number' ? value : 0);
+    }, 0);
+    return sum / arr.length;
+  };
 
   const firstWinRate = calculateAverage(firstHalf, 'winRate');
   const secondWinRate = calculateAverage(secondHalf, 'winRate');

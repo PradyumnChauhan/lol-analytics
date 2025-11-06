@@ -27,6 +27,7 @@ import {
 import { 
   ChallengePlayerData, 
   Challenge,
+  CategoryPoints,
   CHALLENGE_CATEGORIES, 
   CHALLENGE_LEVELS,
   ChallengeUtils 

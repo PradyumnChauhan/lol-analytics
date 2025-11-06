@@ -1,7 +1,7 @@
 'use client';
 
 import { Card } from '@/components/ui/card';
-import { TrendingUp, Trophy, AlertCircle } from 'lucide-react';
+import { Trophy, AlertCircle } from 'lucide-react';
 
 interface ChampionRecommendationsProps {
   insights: string;

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Clock, Trophy, Target, Eye, Coins, Sword, Shield, Activity, Users, Zap, MessageSquare, MapPin, BarChart3, PieChart, TrendingUp, Award, Timer } from 'lucide-react';
+import { X, Clock, Trophy, Target, Eye, Sword, Shield, Users, MessageSquare, BarChart3, PieChart, Award, Zap } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -12,6 +12,7 @@ import { MatchTimelineChart } from './MatchTimelineChart';
 import { ObjectiveTimeline } from './ObjectiveTimeline';
 import { ItemBuildTimeline } from './ItemBuildTimeline';
 import { RuneAnalysis } from './RuneAnalysis';
+import { getChampionName } from '@/lib/champions';
 
 interface MatchParticipant {
   puuid: string;
@@ -146,7 +147,7 @@ interface MatchParticipant {
     playerScore0?: number;
     playerScore1?: number;
     playerScore2?: number;
-    [key: string]: any;
+    [key: string]: unknown;
   };
   playerSubteamId?: number;
   subteamPlacement?: number;
@@ -168,6 +169,7 @@ interface MatchParticipant {
     legendaryCount?: number;
     [key: string]: unknown;
   };
+  [key: string]: unknown;
 }
 
 interface MatchData {
@@ -226,6 +228,50 @@ interface MatchDetailPopupProps {
   onClose: () => void;
 }
 
+type ObjectiveTimelineMatchType = {
+  info?: {
+    participants?: Array<{ [key: string]: unknown; puuid: string; teamId: number }>;
+    gameDuration?: number;
+    gameStartTimestamp?: number;
+    teams?: Array<{ teamId: number; objectives?: Record<string, unknown> }>;
+  };
+};
+
+type ItemBuildTimelineMatchType = {
+  info?: {
+    participants?: Array<{
+      [key: string]: unknown;
+      puuid: string;
+      item0?: number;
+      item1?: number;
+      item2?: number;
+      item3?: number;
+      item4?: number;
+      item5?: number;
+      item6?: number;
+      goldEarned?: number;
+      itemsPurchased?: number;
+    }>;
+    gameStartTimestamp?: number;
+    gameDuration?: number;
+  };
+};
+
+type RuneAnalysisParticipantType = {
+  [key: string]: unknown;
+  perks?: {
+    styles?: Array<{
+      style?: number;
+      selections?: Array<{ perk?: number }>;
+    }>;
+    statPerks?: {
+      defense?: number;
+      flex?: number;
+      offense?: number;
+    };
+  };
+};
+
 export function MatchDetailPopup({ match, playerPuuid, isOpen, onClose }: MatchDetailPopupProps) {
   const [activeTab, setActiveTab] = useState('overview');
   
@@ -255,7 +301,6 @@ export function MatchDetailPopup({ match, playerPuuid, isOpen, onClose }: MatchD
 
   // Calculate team stats for comparison
   const playerTeam = match.info.participants.filter(p => p.teamId === participant.teamId);
-  const enemyTeam = match.info.participants.filter(p => p.teamId !== participant.teamId);
   
   const teamDamage = playerTeam.reduce((sum, p) => sum + (p.totalDamageDealtToChampions || 0), 0);
   const playerDamagePercent = teamDamage > 0 ? ((participant.totalDamageDealtToChampions || 0) / teamDamage * 100) : 0;
@@ -293,6 +338,11 @@ export function MatchDetailPopup({ match, playerPuuid, isOpen, onClose }: MatchD
   const totalMultikills = (participant.doubleKills || 0) + (participant.tripleKills || 0) + 
     (participant.quadraKills || 0) + (participant.pentaKills || 0) + (participant.unrealKills || 0);
 
+  // Type assertions for child components
+  const objectiveTimelineMatch = match as ObjectiveTimelineMatchType;
+  const itemBuildTimelineMatch = match as ItemBuildTimelineMatchType;
+  const runeAnalysisParticipant = participant as RuneAnalysisParticipantType;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-2">
       <div className="w-full max-w-6xl h-[95vh] max-h-[900px] backdrop-blur-xl bg-gradient-to-br from-slate-900/95 via-purple-900/30 to-slate-900/95 border border-yellow-500/30 rounded-xl shadow-2xl flex flex-col">
@@ -303,9 +353,9 @@ export function MatchDetailPopup({ match, playerPuuid, isOpen, onClose }: MatchD
             <div className="relative">
               <div className="w-12 h-12 bg-gradient-to-br from-slate-600 to-slate-700 rounded-lg flex items-center justify-center border-2 border-yellow-500/40">
                 {(() => {
-                  const { getChampionName } = require('@/lib/champions');
                   const champName = participant.championName || getChampionName(participant.championId);
                   return (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img 
                       src={`https://ddragon.leagueoflegends.com/cdn/14.19.1/img/champion/${champName}.png`}
                       alt={champName}
@@ -329,10 +379,7 @@ export function MatchDetailPopup({ match, playerPuuid, isOpen, onClose }: MatchD
             
             <div>
               <h2 className="text-base font-bold text-white leading-tight">
-                {(() => {
-                  const { getChampionName } = require('@/lib/champions');
-                  return participant.championName || getChampionName(participant.championId);
-                })()}
+                {participant.championName || getChampionName(participant.championId)}
               </h2>
               <div className="flex items-center gap-2 text-xs flex-wrap">
                 <Badge className={`${participant.win ? 'bg-green-600' : 'bg-red-600'} text-white text-[10px] px-1.5 py-0.5`}>
@@ -636,6 +683,7 @@ export function MatchDetailPopup({ match, playerPuuid, isOpen, onClose }: MatchD
                         {[participant.item0, participant.item1, participant.item2, participant.item3, participant.item4, participant.item5, participant.item6].map((itemId, index) => (
                           <div key={index} className={`w-8 h-8 rounded border ${itemId ? 'bg-slate-600 border-yellow-500/30' : 'bg-slate-800 border-slate-700'}`}>
                             {itemId ? (
+                              // eslint-disable-next-line @next/next/no-img-element
                               <img 
                                 src={`https://ddragon.leagueoflegends.com/cdn/14.19.1/img/item/${itemId}.png`}
                                 alt={`Item ${itemId}`}
@@ -672,28 +720,77 @@ export function MatchDetailPopup({ match, playerPuuid, isOpen, onClose }: MatchD
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-1">
                   <div className="rounded border border-yellow-500/20 bg-gradient-to-br from-slate-900/80 to-slate-900/60 p-2">
                     <MatchTimelineChart 
-                      timeline={(match as any).timeline || null} 
+                      timeline={(() => {
+                        type TimelineFrameType = {
+                          timestamp: number;
+                          participantFrames?: Record<number, {
+                            gold?: number;
+                            xp?: number;
+                            damageStats?: { totalDamageDoneToChampions?: number };
+                            minionsKilled?: number;
+                            level?: number;
+                          }>;
+                          events?: unknown[];
+                        };
+                        type MatchWithTimeline = {
+                          timeline?: {
+                            frames?: Array<unknown>;
+                            metadata?: { participants?: string[] };
+                          };
+                        };
+                        const matchWithTimeline = match as MatchWithTimeline;
+                        const timeline = matchWithTimeline.timeline;
+                        if (!timeline) return null;
+                        const processedFrames: TimelineFrameType[] = [];
+                        if (Array.isArray(timeline.frames)) {
+                          for (const frame of timeline.frames) {
+                            if (typeof frame === 'object' && frame !== null && 'timestamp' in frame) {
+                              const f = frame as { timestamp: unknown; participantFrames?: unknown; events?: unknown };
+                              const timestamp = typeof f.timestamp === 'number' ? f.timestamp : 0;
+                              const participantFrames = typeof f.participantFrames === 'object' && f.participantFrames !== null
+                                ? f.participantFrames as Record<number, {
+                                    gold?: number;
+                                    xp?: number;
+                                    damageStats?: { totalDamageDoneToChampions?: number };
+                                    minionsKilled?: number;
+                                    level?: number;
+                                  }>
+                                : undefined;
+                              const events = Array.isArray(f.events) ? f.events : [];
+                              processedFrames.push({
+                                timestamp,
+                                participantFrames,
+                                events
+                              });
+                            }
+                          }
+                        }
+                        return {
+                          frames: processedFrames.length > 0 ? processedFrames : undefined,
+                          metadata: timeline.metadata
+                        };
+                      })()} 
                       playerPuuid={participant.puuid}
                       teamId={participant.teamId}
                     />
                   </div>
                   <div className="rounded border border-yellow-500/20 bg-gradient-to-br from-slate-900/80 to-slate-900/60 p-2">
                     <ObjectiveTimeline 
-                      match={match} 
+                      match={objectiveTimelineMatch} 
                       playerPuuid={participant.puuid}
                     />
                   </div>
                 </div>
                 <div className="rounded border border-yellow-500/20 bg-gradient-to-br from-slate-900/80 to-slate-900/60 p-2">
                   <ItemBuildTimeline 
-                    match={match} 
+                    match={itemBuildTimelineMatch} 
                     playerPuuid={participant.puuid}
                   />
                 </div>
 
                 {/* Runes */}
                 <div className="rounded border border-yellow-500/20 bg-gradient-to-br from-slate-900/80 to-slate-900/60 p-2">
-                  <RuneAnalysis participant={participant} />
+                  <RuneAnalysis participant={runeAnalysisParticipant} />
                 </div>
 
                 {/* Advanced Metrics - Multikills & Vision */}
@@ -844,7 +941,7 @@ export function MatchDetailPopup({ match, playerPuuid, isOpen, onClose }: MatchD
                           <div className="text-xl font-bold text-white mb-0.5">
                             {playerDamagePercent.toFixed(1)}%
                           </div>
-                          <div className="text-white/60 text-xs">of team's total damage</div>
+                          <div className="text-white/60 text-xs">of team&apos;s total damage</div>
                         </div>
                         <div className="w-full bg-slate-700 rounded-full h-1.5">
                           <div 
@@ -916,8 +1013,7 @@ export function MatchDetailPopup({ match, playerPuuid, isOpen, onClose }: MatchD
                         <h3 className="text-white text-sm font-bold">Champion Bans</h3>
                       </div>
                       <div className="space-y-1.5">
-                        {match.info.teams.map((team: any, teamIndex: number) => {
-                          const { getChampionName } = require('@/lib/champions');
+                        {match.info.teams.map((team: { teamId: number; bans?: Array<{ championId: number; [key: string]: unknown }> }, teamIndex: number) => {
                           const isPlayerTeam = team.teamId === participant.teamId;
                           return (
                             <div key={teamIndex} className="space-y-1">
@@ -926,12 +1022,13 @@ export function MatchDetailPopup({ match, playerPuuid, isOpen, onClose }: MatchD
                               </div>
                               <div className="flex flex-wrap gap-1">
                                 {team.bans && team.bans.length > 0 ? (
-                                  team.bans.map((ban: any, banIndex: number) => (
+                                  team.bans.map((ban: { championId: number }, banIndex: number) => (
                                     <div
                                       key={banIndex}
                                       className="w-8 h-8 rounded border border-yellow-500/30 bg-slate-800/50 flex items-center justify-center"
                                       title={getChampionName(ban.championId)}
                                     >
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
                                       <img
                                         src={`https://ddragon.leagueoflegends.com/cdn/14.19.1/img/champion/${getChampionName(ban.championId)}.png`}
                                         alt={getChampionName(ban.championId)}
@@ -966,36 +1063,59 @@ export function MatchDetailPopup({ match, playerPuuid, isOpen, onClose }: MatchD
                         <h3 className="text-white text-sm font-bold">Team Achievements</h3>
                       </div>
                       <div className="space-y-1.5">
-                        {match.info.teams.map((team: any, teamIndex: number) => {
+                        {match.info.teams.map((team: { teamId: number; bans?: Array<{ championId: number; [key: string]: unknown }>; feats?: Record<string, unknown> }, teamIndex: number) => {
                           const isPlayerTeam = team.teamId === participant.teamId;
                           const feats = team.feats || {};
+                          
+                          // Extract feat states with proper type checking
+                          const firstBloodFeat = feats.FIRST_BLOOD;
+                          const hasFirstBlood = firstBloodFeat !== null && firstBloodFeat !== undefined && typeof firstBloodFeat === 'object';
+                          const firstBloodState = hasFirstBlood && 'featState' in firstBloodFeat 
+                            ? (firstBloodFeat as { featState?: number }).featState 
+                            : undefined;
+                          const firstBloodAchieved = typeof firstBloodState === 'number' && firstBloodState === 1001;
+                          
+                          const firstTurretFeat = feats.FIRST_TURRET;
+                          const hasFirstTurret = firstTurretFeat !== null && firstTurretFeat !== undefined && typeof firstTurretFeat === 'object';
+                          const firstTurretState = hasFirstTurret && 'featState' in firstTurretFeat 
+                            ? (firstTurretFeat as { featState?: number }).featState 
+                            : undefined;
+                          const firstTurretAchieved = typeof firstTurretState === 'number' && firstTurretState === 1001;
+                          
+                          const epicMonsterFeat = feats.EPIC_MONSTER_KILL;
+                          const hasEpicMonster = epicMonsterFeat !== null && epicMonsterFeat !== undefined && typeof epicMonsterFeat === 'object';
+                          const epicMonsterState = hasEpicMonster && 'featState' in epicMonsterFeat 
+                            ? (epicMonsterFeat as { featState?: number }).featState 
+                            : undefined;
+                          const epicMonsterAchieved = typeof epicMonsterState === 'number' && epicMonsterState === 1;
+                          
                           return (
                             <div key={teamIndex} className="space-y-1">
                               <div className="text-white/70 text-[10px] font-semibold">
                                 {isPlayerTeam ? 'Your Team' : 'Enemy Team'}
                               </div>
                               <div className="space-y-0.5">
-                                {feats.FIRST_BLOOD && (
+                                {hasFirstBlood && typeof firstBloodState === 'number' && (
                                   <div className="flex items-center justify-between text-[10px]">
                                     <span className="text-white/70">First Blood</span>
-                                    <Badge className={`text-[9px] px-1 py-0 ${feats.FIRST_BLOOD.featState === 1001 ? 'bg-green-500' : 'bg-slate-600'}`}>
-                                      {feats.FIRST_BLOOD.featState === 1001 ? 'Achieved' : 'Missed'}
+                                    <Badge className={`text-[9px] px-1 py-0 ${firstBloodAchieved ? 'bg-green-500' : 'bg-slate-600'}`}>
+                                      {firstBloodAchieved ? 'Achieved' : 'Missed'}
                                     </Badge>
                                   </div>
                                 )}
-                                {feats.FIRST_TURRET && (
+                                {hasFirstTurret && typeof firstTurretState === 'number' && (
                                   <div className="flex items-center justify-between text-[10px]">
                                     <span className="text-white/70">First Turret</span>
-                                    <Badge className={`text-[9px] px-1 py-0 ${feats.FIRST_TURRET.featState === 1001 ? 'bg-green-500' : 'bg-slate-600'}`}>
-                                      {feats.FIRST_TURRET.featState === 1001 ? 'Achieved' : 'Missed'}
+                                    <Badge className={`text-[9px] px-1 py-0 ${firstTurretAchieved ? 'bg-green-500' : 'bg-slate-600'}`}>
+                                      {firstTurretAchieved ? 'Achieved' : 'Missed'}
                                     </Badge>
                                   </div>
                                 )}
-                                {feats.EPIC_MONSTER_KILL && (
+                                {hasEpicMonster && typeof epicMonsterState === 'number' && (
                                   <div className="flex items-center justify-between text-[10px]">
                                     <span className="text-white/70">Epic Monster Kill</span>
-                                    <Badge className={`text-[9px] px-1 py-0 ${feats.EPIC_MONSTER_KILL.featState === 1 ? 'bg-green-500' : 'bg-slate-600'}`}>
-                                      {feats.EPIC_MONSTER_KILL.featState === 1 ? 'Achieved' : 'Missed'}
+                                    <Badge className={`text-[9px] px-1 py-0 ${epicMonsterAchieved ? 'bg-green-500' : 'bg-slate-600'}`}>
+                                      {epicMonsterAchieved ? 'Achieved' : 'Missed'}
                                     </Badge>
                                   </div>
                                 )}

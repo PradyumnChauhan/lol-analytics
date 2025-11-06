@@ -23,10 +23,7 @@ interface FeaturedGame {
   }>;
 }
 
-interface FeaturedGamesResponse {
-  gameList: FeaturedGame[];
-  clientRefreshInterval: number;
-}
+// Removed unused interface FeaturedGamesResponse
 
 export default function FeaturedGamesPage() {
   const [games, setGames] = useState<FeaturedGame[]>([]);
