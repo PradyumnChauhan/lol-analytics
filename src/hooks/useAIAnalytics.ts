@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { AIDataPayload } from '@/lib/ai/data-aggregator';
+import { getBackendUrl } from '@/lib/utils/backend-url';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -32,8 +33,6 @@ interface UseAIAnalyticsReturn {
   generateSummary: (playerData: AIDataPayload) => Promise<void>;
   clearChat: () => void;
 }
-
-const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
 
 // Cache for dashboard insights (keyed by data hash)
 const insightsCache = new Map<string, { data: DashboardInsights; timestamp: number }>();
@@ -74,7 +73,7 @@ export function useAIAnalytics(): UseAIAnalyticsReturn {
     setError(null);
 
     try {
-      const response = await fetch(`${BASE_URL}/api/ai/dashboard-insights`, {
+      const response = await fetch(`${getBackendUrl()}/api/ai/dashboard-insights`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -137,7 +136,7 @@ export function useAIAnalytics(): UseAIAnalyticsReturn {
     setChatHistory((prev) => [...prev, userMessage]);
 
     try {
-      const response = await fetch(`${BASE_URL}/api/ai/chat`, {
+      const response = await fetch(`${getBackendUrl()}/api/ai/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -192,7 +191,7 @@ export function useAIAnalytics(): UseAIAnalyticsReturn {
     setError(null);
 
     try {
-      const response = await fetch(`${BASE_URL}/api/ai/year-end-summary`, {
+      const response = await fetch(`${getBackendUrl()}/api/ai/year-end-summary`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

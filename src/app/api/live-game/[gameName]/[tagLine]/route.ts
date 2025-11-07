@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+import { getBackendUrl } from '@/lib/utils/backend-url';
 
 export async function GET(
   request: NextRequest,
@@ -17,10 +16,11 @@ export async function GET(
       'europe': 'euw1',
     };
     const platform = regionToPlatform[region] || 'na1';
+    const backendUrl = getBackendUrl();
 
     // Step 1: Get account by Riot ID
     const accountResponse = await fetch(
-      `${BASE_URL}/api/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}?region=${region}`
+      `${backendUrl}/api/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}?region=${region}`
     );
     if (!accountResponse.ok) {
       return NextResponse.json(
@@ -32,7 +32,7 @@ export async function GET(
 
     // Step 2: Get summoner data
     const summonerResponse = await fetch(
-      `${BASE_URL}/api/summoner/v4/summoners/by-puuid/${account.puuid}?region=${platform}&autoDetect=true`
+      `${backendUrl}/api/summoner/v4/summoners/by-puuid/${account.puuid}?region=${platform}&autoDetect=true`
     );
     if (!summonerResponse.ok) {
       return NextResponse.json(
@@ -44,7 +44,7 @@ export async function GET(
 
     // Step 3: Get live game data
     const liveGameResponse = await fetch(
-      `${BASE_URL}/api/spectator/v5/active-games/by-summoner/${summoner.id}?region=${platform}`
+      `${backendUrl}/api/spectator/v5/active-games/by-summoner/${summoner.id}?region=${platform}`
     );
     
     if (!liveGameResponse.ok) {

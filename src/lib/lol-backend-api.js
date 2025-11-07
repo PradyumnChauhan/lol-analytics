@@ -1,10 +1,13 @@
 // API client for LOL Analytics Backend
+// Import the centralized backend URL utility
+// Note: This is a .js file, so we need to handle the import differently
+// For now, we'll use a similar pattern but ensure consistency
 const getDefaultBaseURL = () => {
   if (typeof window !== 'undefined') {
-    // Client-side: use environment variable
+    // Client-side: must use NEXT_PUBLIC_ prefix
     return process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
   }
-  // Server-side: use environment variable
+  // Server-side: can use BACKEND_URL or NEXT_PUBLIC_BACKEND_URL
   return process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
 };
 

@@ -19,7 +19,7 @@ run:
     - name: NODE_ENV
       value: "production"
     - name: FRONTEND_URL
-      value: "https://your-amplify-url.amplifyapp.com"
+      value: "https://main.d2ziovlxp7l6jf.amplifyapp.com"
     - name: CONFIG_FILE_PATH
       value: "./backend/config/riot-config.json"
 

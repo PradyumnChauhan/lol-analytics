@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation"
 import React, { useState, useEffect, useCallback, Suspense, useMemo } from "react"
+import { getBackendUrl } from "@/lib/utils/backend-url"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -118,7 +119,6 @@ function PlayerDashboard() {
   const [aggregatedAIData, setAggregatedAIData] = useState<AIDataPayload | null>(null)
 
   const isClient = typeof window !== "undefined"
-  const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'
 
   // Helper function to safely parse JSON responses
   const safeJsonParse = async (res: Response) => {
@@ -193,7 +193,7 @@ function PlayerDashboard() {
 
       // Fetch total mastery score if available
       if (puuid && data.region) {
-        fetch(`${BASE_URL}/api/champion-mastery/v4/scores/by-puuid/${puuid}?region=${data.region}`)
+        fetch(`${getBackendUrl()}/api/champion-mastery/v4/scores/by-puuid/${puuid}?region=${data.region}`)
           .then(res => res.ok ? res.json() : null)
           .then(scoreData => {
             if (scoreData?.score !== undefined) {
@@ -232,7 +232,7 @@ function PlayerDashboard() {
       const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
       setPlayerData((prev) => ({ ...prev, isLoading: false, error: errorMessage }))
     }
-  }, [gameName, tagLine, BASE_URL])
+  }, [gameName, tagLine])
 
   const fetchChallenges = useCallback(async () => {
     setIsChallengeLoading(true)

@@ -1,7 +1,8 @@
 // API service client for LoL Analytics backend
 import type { MatchDto } from '@/types/riot-api';
+import { getBackendUrl } from '@/lib/utils/backend-url';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+const API_BASE_URL = getBackendUrl();
 
 export interface SummonerData {
   id: string;

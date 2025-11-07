@@ -3,6 +3,8 @@
  * Provides access to player challenges, achievements, and leaderboards
  */
 
+import { getBackendUrl } from '@/lib/utils/backend-url';
+
 // Challenge Types
 export interface ChallengeLevel {
   level: 'IRON' | 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND' | 'MASTER' | 'GRANDMASTER' | 'CHALLENGER';
@@ -159,7 +161,8 @@ export class ChallengesAPI {
   private baseUrl: string;
 
   constructor(baseUrl?: string) {
-    this.baseUrl = baseUrl || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+    // Use centralized backend URL utility if not provided
+    this.baseUrl = baseUrl || getBackendUrl();
   }
 
   /**

@@ -3,6 +3,8 @@
  * Provides access to Clash tournaments, teams, and player data
  */
 
+import { getBackendUrl } from '@/lib/utils/backend-url';
+
 // Clash Tournament Types
 export interface Tournament {
   id: number;
@@ -122,7 +124,8 @@ export class ClashAPI {
   private baseUrl: string;
 
   constructor(baseUrl?: string) {
-    this.baseUrl = baseUrl || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+    // Use centralized backend URL utility if not provided
+    this.baseUrl = baseUrl || getBackendUrl();
   }
 
   /**

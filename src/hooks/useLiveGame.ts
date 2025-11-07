@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { getBackendUrl } from '@/lib/utils/backend-url';
 
 interface LiveGameParticipant {
   puuid: string;
@@ -43,8 +44,6 @@ interface UseLiveGameReturn {
   refetch: () => void;
 }
 
-const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
-
 export function useLiveGame(puuid: string, region: string = 'kr'): UseLiveGameReturn {
   const [liveGameData, setLiveGameData] = useState<LiveGameData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -59,7 +58,7 @@ export function useLiveGame(puuid: string, region: string = 'kr'): UseLiveGameRe
 
     try {
       const response = await fetch(
-        `${BASE_URL}/api/spectator/v5/active-games/by-summoner/${puuid}?region=${region}`
+        `${getBackendUrl()}/api/spectator/v5/active-games/by-summoner/${puuid}?region=${region}`
       );
 
       if (response.status === 404) {
@@ -125,7 +124,7 @@ export function useFeaturedGames(region: string = 'kr') {
     setError(null);
 
     try {
-      const response = await fetch(`${BASE_URL}/api/spectator/v5/featured-games?region=${region}`);
+      const response = await fetch(`${getBackendUrl()}/api/spectator/v5/featured-games?region=${region}`);
       
       if (!response.ok) {
         throw new Error(`Failed to fetch featured games: ${response.status}`);

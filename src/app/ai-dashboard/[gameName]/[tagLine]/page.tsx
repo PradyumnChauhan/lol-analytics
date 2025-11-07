@@ -11,8 +11,7 @@ import { FloatingAssistant } from '@/components/ai/FloatingAssistant';
 import { localStorageManager } from '@/lib/storage';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-
-const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+import { getBackendUrl } from '@/lib/utils/backend-url';
 
 interface MatchParticipant {
   puuid: string;
@@ -196,7 +195,7 @@ export default function AIDashboardPage() {
 
       // Step 1: Get account by Riot ID
       const accountResponse = await fetch(
-        `${BASE_URL}/api/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}?region=${region}`
+        `${getBackendUrl()}/api/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}?region=${region}`
       );
       if (!accountResponse.ok) {
         throw new Error(`Account fetch failed: ${accountResponse.status}`);
@@ -205,20 +204,20 @@ export default function AIDashboardPage() {
 
       // Step 2: Get summoner data
       const summonerResponse = await fetch(
-        `${BASE_URL}/api/summoner/v4/summoners/by-puuid/${account.puuid}?region=${platform}&autoDetect=true`
+        `${getBackendUrl()}/api/summoner/v4/summoners/by-puuid/${account.puuid}?region=${platform}&autoDetect=true`
       );
       const summoner = summonerResponse.ok ? await summonerResponse.json() : null;
 
       // Step 3: Get match history
       const matchIdsResponse = await fetch(
-        `${BASE_URL}/api/match/v5/matches/by-puuid/${account.puuid}/ids?region=${region}&count=30`
+        `${getBackendUrl()}/api/match/v5/matches/by-puuid/${account.puuid}/ids?region=${region}&count=30`
       );
       const matchIds = matchIdsResponse.ok ? await matchIdsResponse.json() : [];
 
       // Step 4: Get detailed matches
       const matchDetails = await Promise.all(
         matchIds.slice(0, 30).map(async (matchId: string) => {
-          const matchResponse = await fetch(`${BASE_URL}/api/match/v5/matches/${matchId}?region=${region}`);
+          const matchResponse = await fetch(`${getBackendUrl()}/api/match/v5/matches/${matchId}?region=${region}`);
           return matchResponse.ok ? await matchResponse.json() : null;
         })
       );
@@ -226,13 +225,13 @@ export default function AIDashboardPage() {
 
       // Step 5: Get champion mastery
       const masteryResponse = await fetch(
-        `${BASE_URL}/api/champion-mastery/v4/champion-masteries/by-puuid/${account.puuid}?region=${platform}`
+        `${getBackendUrl()}/api/champion-mastery/v4/champion-masteries/by-puuid/${account.puuid}?region=${platform}`
       );
       const championMastery = masteryResponse.ok ? await masteryResponse.json() : [];
 
       // Step 6: Get league entries
       const leagueResponse = await fetch(
-        `${BASE_URL}/api/league/v4/entries/by-puuid/${account.puuid}?region=${platform}`
+        `${getBackendUrl()}/api/league/v4/entries/by-puuid/${account.puuid}?region=${platform}`
       );
       const leagueEntries = leagueResponse.ok ? await leagueResponse.json() : [];
 
@@ -240,7 +239,7 @@ export default function AIDashboardPage() {
       let challenges = null;
       try {
         const challengeResponse = await fetch(
-          `${BASE_URL}/api/challenges/v1/player-data/by-puuid/${account.puuid}?region=${platform}`
+          `${getBackendUrl()}/api/challenges/v1/player-data/by-puuid/${account.puuid}?region=${platform}`
         );
         if (challengeResponse.ok) {
           challenges = await challengeResponse.json();
@@ -254,13 +253,13 @@ export default function AIDashboardPage() {
       try {
         if (summoner?.id) {
           const clashResponse = await fetch(
-            `${BASE_URL}/api/clash/v1/players/by-summoner/${summoner.id}?region=${platform}`
+            `${getBackendUrl()}/api/clash/v1/players/by-summoner/${summoner.id}?region=${platform}`
           );
           if (clashResponse.ok) {
             await clashResponse.json(); // clashData not used
             // If we get clash data, also fetch tournaments
             const tournamentsResponse = await fetch(
-              `${BASE_URL}/api/clash/v1/tournaments?region=${platform}`
+              `${getBackendUrl()}/api/clash/v1/tournaments?region=${platform}`
             );
             if (tournamentsResponse.ok) {
               clash = await tournamentsResponse.json();

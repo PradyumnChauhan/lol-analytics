@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Brain, Sparkles, TrendingUp, Loader2, Share2, Copy } from 'lucide-react';
+import { getBackendUrl } from '@/lib/utils/backend-url';
 
 interface MatchData {
   [key: string]: unknown;
@@ -28,8 +29,6 @@ export function AIInsights({ matchData, playerStats, gameName, tagLine }: AIInsi
   const [loading, setLoading] = useState<'insights' | 'summary' | 'improvements' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
-
   const fetchAIInsights = async (type: 'insights' | 'summary' | 'improvements') => {
     setLoading(type);
     setError(null);
@@ -39,7 +38,7 @@ export function AIInsights({ matchData, playerStats, gameName, tagLine }: AIInsi
         ? '/api/ai/year-end-summary'
         : '/api/ai/analyze';
       
-      const response = await fetch(`${BASE_URL}${endpoint}`, {
+      const response = await fetch(`${getBackendUrl()}${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

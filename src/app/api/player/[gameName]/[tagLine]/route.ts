@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+import { getBackendUrl } from '@/lib/utils/backend-url';
 
 export async function GET(
   request: NextRequest,
@@ -18,9 +17,11 @@ export async function GET(
     };
     const platform = regionToPlatform[region] || 'na1';
 
+    const backendUrl = getBackendUrl();
+    
     // Step 1: Get account by Riot ID
     const accountResponse = await fetch(
-      `${BASE_URL}/api/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}?region=${region}`
+      `${backendUrl}/api/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}?region=${region}`
     );
     if (!accountResponse.ok) {
       return NextResponse.json(
@@ -32,20 +33,20 @@ export async function GET(
 
     // Step 2: Get summoner data
     const summonerResponse = await fetch(
-      `${BASE_URL}/api/summoner/v4/summoners/by-puuid/${account.puuid}?region=${platform}&autoDetect=true`
+      `${backendUrl}/api/summoner/v4/summoners/by-puuid/${account.puuid}?region=${platform}&autoDetect=true`
     );
     const summoner = summonerResponse.ok ? await summonerResponse.json() : null;
 
     // Step 3: Get match history
     const matchIdsResponse = await fetch(
-      `${BASE_URL}/api/match/v5/matches/by-puuid/${account.puuid}/ids?region=${region}&count=30`
+      `${backendUrl}/api/match/v5/matches/by-puuid/${account.puuid}/ids?region=${region}&count=30`
     );
     const matchIds = matchIdsResponse.ok ? await matchIdsResponse.json() : [];
 
     // Step 4: Get detailed matches (limited to 25 for performance)
     const matchDetails = await Promise.all(
       matchIds.slice(0, 25).map(async (matchId: string) => {
-        const matchResponse = await fetch(`${BASE_URL}/api/match/v5/matches/${matchId}?region=${region}`);
+        const matchResponse = await fetch(`${backendUrl}/api/match/v5/matches/${matchId}?region=${region}`);
         return matchResponse.ok ? await matchResponse.json() : null;
       })
     );
@@ -53,13 +54,13 @@ export async function GET(
 
     // Step 5: Get champion mastery
     const masteryResponse = await fetch(
-      `${BASE_URL}/api/champion-mastery/v4/champion-masteries/by-puuid/${account.puuid}?region=${platform}`
+      `${backendUrl}/api/champion-mastery/v4/champion-masteries/by-puuid/${account.puuid}?region=${platform}`
     );
     const championMastery = masteryResponse.ok ? await masteryResponse.json() : [];
 
     // Step 6: Get league entries
     const leagueResponse = await fetch(
-      `${BASE_URL}/api/league/v4/entries/by-puuid/${account.puuid}?region=${platform}`
+      `${backendUrl}/api/league/v4/entries/by-puuid/${account.puuid}?region=${platform}`
     );
     const leagueEntries = leagueResponse.ok ? await leagueResponse.json() : [];
 
@@ -67,7 +68,7 @@ export async function GET(
     let challenges = null;
     try {
       const challengeResponse = await fetch(
-        `${BASE_URL}/api/challenges/v1/player-data/by-puuid/${account.puuid}?region=${platform}`
+        `${backendUrl}/api/challenges/v1/player-data/by-puuid/${account.puuid}?region=${platform}`
       );
       if (challengeResponse.ok) {
         challenges = await challengeResponse.json();
@@ -81,13 +82,13 @@ export async function GET(
     try {
       if (summoner?.id) {
         const clashResponse = await fetch(
-          `${BASE_URL}/api/clash/v1/players/by-summoner/${summoner.id}?region=${platform}`
+          `${backendUrl}/api/clash/v1/players/by-summoner/${summoner.id}?region=${platform}`
         );
         if (clashResponse.ok) {
           await clashResponse.json(); // clashData not used
           // If we get clash data, also fetch tournaments
           const tournamentsResponse = await fetch(
-            `${BASE_URL}/api/clash/v1/tournaments?region=${platform}`
+            `${backendUrl}/api/clash/v1/tournaments?region=${platform}`
           );
           if (tournamentsResponse.ok) {
             clash = await tournamentsResponse.json();

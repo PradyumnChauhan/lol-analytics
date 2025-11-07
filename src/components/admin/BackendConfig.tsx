@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { AlertCircle, CheckCircle, Settings, Key, Cookie } from 'lucide-react';
 import LOLBackendAPI from '@/lib/lol-backend-api';
+import { getBackendUrl } from '@/lib/utils/backend-url';
 
 interface AuthStatus {
   isConfigured: boolean;
@@ -41,7 +42,7 @@ export default function BackendConfig() {
       setAuthStatus(status);
       setError(null);
       } catch {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = getBackendUrl();
       setError(`Failed to connect to backend server. Make sure it's running on ${backendUrl}`);
     } finally {
       setLoading(false);
