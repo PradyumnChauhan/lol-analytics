@@ -79,18 +79,31 @@ export async function GET(
           const errorDetails = error instanceof Error ? {
             message: error.message,
             name: error.name,
-            stack: error.stack?.split('\n')[0]
+            code: (error as { code?: string }).code,
+            cause: (error as { cause?: unknown }).cause,
+            errno: (error as { errno?: number }).errno,
+            syscall: (error as { syscall?: string }).syscall,
+            stack: error.stack?.split('\n').slice(0, 3).join('\n')
           } : { error: String(error) };
           
           console.error(`[fetchWithRetry] ${endpointName} error (attempt ${i + 1}/${retries + 1}):`, {
             url: fullUrl,
+            backendUrl: backendUrl,
             ...errorDetails,
             timestamp: new Date().toISOString()
           });
           
           if (i === retries) {
             console.error(`[fetchWithRetry] ${endpointName} failed after all retries`);
-            throw error;
+            // Provide more detailed error information
+            const enhancedError = new Error(
+              `Failed to connect to backend: ${errorDetails.message || 'Unknown error'}. ` +
+              `Backend URL: ${backendUrl}. ` +
+              `This usually means the backend server is not running or not accessible. ` +
+              `Error code: ${errorDetails.code || 'N/A'}`
+            );
+            (enhancedError as { cause?: unknown }).cause = error;
+            throw enhancedError;
           }
           
           // Wait before retry (exponential backoff)
@@ -356,6 +369,10 @@ export async function GET(
     const errorDetails = error instanceof Error ? {
       message: error.message,
       name: error.name,
+      code: (error as { code?: string }).code,
+      errno: (error as { errno?: number }).errno,
+      syscall: (error as { syscall?: string }).syscall,
+      cause: (error as { cause?: unknown }).cause,
       stack: error.stack?.split('\n').slice(0, 5).join('\n')
     } : { error: String(error) };
     
@@ -368,11 +385,27 @@ export async function GET(
       timestamp: new Date().toISOString()
     });
     
-    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch player data';
+    // Provide helpful error message based on error code
+    let userMessage = 'Failed to fetch player data';
+    if (errorDetails.code === 'ECONNREFUSED') {
+      userMessage = 'Backend server is not running or not accessible. Please check if the backend server is running.';
+    } else if (errorDetails.code === 'ETIMEDOUT' || errorDetails.code === 'ENOTFOUND') {
+      userMessage = 'Backend server is not reachable. Please check the backend URL and network connectivity.';
+    } else if (errorDetails.code === 'ECONNRESET') {
+      userMessage = 'Connection to backend was reset. The server may be overloaded.';
+    } else {
+      userMessage = error instanceof Error ? error.message : 'Failed to fetch player data';
+    }
+    
     return NextResponse.json(
       { 
-        message: errorMessage,
-        details: process.env.NODE_ENV === 'development' ? errorDetails : undefined
+        message: userMessage,
+        details: process.env.NODE_ENV === 'development' ? errorDetails : undefined,
+        troubleshooting: {
+          checkBackend: 'Verify the backend server is running at ' + getBackendUrl(),
+          testEndpoint: 'Try accessing /api/backend-test to diagnose connectivity issues',
+          checkNetwork: 'If deployed on AWS Amplify, ensure the backend is publicly accessible'
+        }
       },
       { status: 500 }
     );

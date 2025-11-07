@@ -25,13 +25,24 @@ export async function GET(request: NextRequest) {
     let responseTime: number;
     
     try {
-      response = await fetch(testUrl, {
-        method: 'GET',
-        headers: {
-          'Connection': 'keep-alive',
-        },
-        signal: AbortSignal.timeout(10000), // 10 second timeout
-      });
+      // Try to fetch with detailed error handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
+      try {
+        response = await fetch(testUrl, {
+          method: 'GET',
+          headers: {
+            'Connection': 'keep-alive',
+          },
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        throw fetchError;
+      }
+      
       responseTime = Date.now() - startTime;
       
       console.log('[Backend Test] Health check response:', {
@@ -47,20 +58,41 @@ export async function GET(request: NextRequest) {
       const errorDetails = fetchError instanceof Error ? {
         message: fetchError.message,
         name: fetchError.name,
-        cause: fetchError.cause
+        code: (fetchError as { code?: string }).code,
+        errno: (fetchError as { errno?: number }).errno,
+        syscall: (fetchError as { syscall?: string }).syscall,
+        cause: fetchError.cause,
+        stack: fetchError.stack?.split('\n').slice(0, 5).join('\n')
       } : { error: String(fetchError) };
       
       console.error('[Backend Test] Health check failed:', {
         url: testUrl,
+        backendUrl,
         responseTime: `${responseTime}ms`,
         ...errorDetails
       });
       
+      // Provide helpful error messages based on error code
+      let errorMessage = 'Failed to connect to backend';
+      if (errorDetails.code === 'ECONNREFUSED') {
+        errorMessage = 'Backend server is not running or not accessible. Check if the server is running on the specified URL.';
+      } else if (errorDetails.code === 'ETIMEDOUT' || errorDetails.code === 'ENOTFOUND') {
+        errorMessage = 'Backend server is not reachable. Check the backend URL and network connectivity.';
+      } else if (errorDetails.code === 'ECONNRESET') {
+        errorMessage = 'Connection to backend was reset. The server may be overloaded or the connection was interrupted.';
+      }
+      
       return NextResponse.json({
         success: false,
         backendUrl,
-        error: 'Failed to connect to backend',
+        error: errorMessage,
         details: errorDetails,
+        troubleshooting: {
+          checkBackendRunning: 'Verify the backend server is running on ' + backendUrl,
+          checkNetwork: 'Check if the backend is accessible from this server',
+          checkFirewall: 'Verify firewall/security group allows connections',
+          checkUrl: 'Ensure the backend URL is correct'
+        },
         timestamp: new Date().toISOString()
       }, { status: 500 });
     }

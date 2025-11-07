@@ -24,6 +24,8 @@ export async function POST(request: NextRequest) {
     };
 
     const startTime = Date.now();
+    // Dashboard insights can take up to 15 minutes (Lambda timeout)
+    // Set timeout to 15 minutes (900000ms) to match Lambda configuration
     const response = await fetch(`${backendUrl}/api/ai/dashboard-insights`, {
       method: 'POST',
       headers: {
@@ -31,7 +33,7 @@ export async function POST(request: NextRequest) {
         'Connection': 'keep-alive',
       },
       body: JSON.stringify(body),
-      signal: createTimeoutSignal(60000), // 60 second timeout for AI requests
+      signal: createTimeoutSignal(900000), // 15 minutes to match Lambda timeout
     });
 
     const duration = Date.now() - startTime;

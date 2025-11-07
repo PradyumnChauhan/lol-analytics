@@ -1058,15 +1058,24 @@ app.get('/api/match/v5/matches/:matchId/timeline', async (req, res) => {
 
 // AI Insights endpoint - Analyzes player data using Bedrock
 // Requires BEDROCK_LAMBDA_URL environment variable
-const BEDROCK_LAMBDA_URL = process.env.BEDROCK_LAMBDA_URL || '';
+// Helper function to get Bedrock URL (checks both env and const)
+function getBedrockLambdaUrl() {
+  // Try process.env first (in case it was updated), then fallback to const
+  const url = (process.env.BEDROCK_LAMBDA_URL || '').trim();
+  return url || '';
+}
+
+const BEDROCK_LAMBDA_URL = getBedrockLambdaUrl();
 
 // Log Bedrock configuration status on startup
 if (!BEDROCK_LAMBDA_URL) {
   console.log('⚠️  BEDROCK_LAMBDA_URL not configured - AI endpoints will be disabled');
   console.log('   Set BEDROCK_LAMBDA_URL environment variable or add it to .env file');
   console.log('   Example: BEDROCK_LAMBDA_URL=https://your-lambda-function-url.lambda-url.region.on.aws/');
+  console.log('   Current process.env.BEDROCK_LAMBDA_URL:', process.env.BEDROCK_LAMBDA_URL || 'undefined');
 } else {
   console.log(`✅ BEDROCK_LAMBDA_URL configured: ${BEDROCK_LAMBDA_URL.substring(0, 50)}...`);
+  console.log(`   Full URL length: ${BEDROCK_LAMBDA_URL.length} characters`);
 }
 
 // Conversation history storage (in-memory, keyed by puuid)
@@ -1086,7 +1095,9 @@ setInterval(() => {
 
 app.post('/api/ai/analyze', async (req, res) => {
   try {
-    if (!BEDROCK_LAMBDA_URL) {
+    const bedrockUrl = getBedrockLambdaUrl();
+    if (!bedrockUrl) {
+      console.error('[AI Analyze] BEDROCK_LAMBDA_URL not configured');
       return res.status(500).json({
         error: 'Bedrock Lambda URL not configured',
         details: 'Set BEDROCK_LAMBDA_URL environment variable'
@@ -1104,7 +1115,7 @@ app.post('/api/ai/analyze', async (req, res) => {
     console.log(`🤖 [AI] Analyzing ${matchData.length} matches, type: ${analysisType}`);
     
     // Call Bedrock Lambda function
-    const response = await axios.post(BEDROCK_LAMBDA_URL, {
+    const response = await axios.post(bedrockUrl, {
       matchData,
       playerStats: playerStats || {},
       analysisType
@@ -1141,10 +1152,22 @@ app.post('/api/ai/analyze', async (req, res) => {
 // AI Dashboard Insights endpoint - Comprehensive analysis
 app.post('/api/ai/dashboard-insights', async (req, res) => {
   try {
-    if (!BEDROCK_LAMBDA_URL) {
+    const bedrockUrl = getBedrockLambdaUrl();
+    console.log('[AI Dashboard] BEDROCK_LAMBDA_URL check:', {
+      url: bedrockUrl ? `${bedrockUrl.substring(0, 50)}...` : 'empty',
+      length: bedrockUrl.length,
+      fromEnv: !!process.env.BEDROCK_LAMBDA_URL
+    });
+    
+    if (!bedrockUrl) {
+      console.error('[AI Dashboard] BEDROCK_LAMBDA_URL is empty or not set');
       return res.status(500).json({
         error: 'Bedrock Lambda URL not configured',
-        details: 'Set BEDROCK_LAMBDA_URL environment variable'
+        details: 'Set BEDROCK_LAMBDA_URL environment variable',
+        debug: {
+          envVar: process.env.BEDROCK_LAMBDA_URL ? 'exists' : 'missing',
+          envValue: process.env.BEDROCK_LAMBDA_URL ? `${process.env.BEDROCK_LAMBDA_URL.substring(0, 30)}...` : 'N/A'
+        }
       });
     }
 
@@ -1158,15 +1181,18 @@ app.post('/api/ai/dashboard-insights', async (req, res) => {
     
     const playerName = `${playerData.playerInfo.gameName || ''}#${playerData.playerInfo.tagLine || ''}`;
     console.log(`🤖 [AI] Generating dashboard insights for ${playerName}`);
+    console.log(`[AI Dashboard] Using Bedrock URL: ${bedrockUrl.substring(0, 60)}...`);
     
-    const response = await axios.post(BEDROCK_LAMBDA_URL, {
+    // Dashboard insights can take up to 15 minutes (Lambda timeout)
+    // Set timeout to 15 minutes (900000ms) to match Lambda configuration
+    const response = await axios.post(bedrockUrl, {
       playerData,
       analysisType: 'dashboard'
     }, {
       headers: {
         'Content-Type': 'application/json'
       },
-      timeout: 30000
+      timeout: 900000 // 15 minutes to match Lambda timeout
     });
     
     const aiResponse = response.data;
@@ -1217,7 +1243,9 @@ app.post('/api/ai/dashboard-insights', async (req, res) => {
 // AI Chat endpoint - Conversational queries
 app.post('/api/ai/chat', async (req, res) => {
   try {
-    if (!BEDROCK_LAMBDA_URL) {
+    const bedrockUrl = getBedrockLambdaUrl();
+    if (!bedrockUrl) {
+      console.error('[AI Chat] BEDROCK_LAMBDA_URL not configured');
       return res.status(500).json({
         error: 'Bedrock Lambda URL not configured',
         details: 'Set BEDROCK_LAMBDA_URL environment variable'
@@ -1267,7 +1295,7 @@ app.post('/api/ai/chat', async (req, res) => {
     
     console.log(`💬 [AI Chat] Question from ${playerData.playerInfo.gameName}: ${question.substring(0, 50)}...`);
     
-    const response = await axios.post(BEDROCK_LAMBDA_URL, {
+    const response = await axios.post(bedrockUrl, {
       playerData,
       analysisType: 'chat',
       question: question.trim(),
@@ -1332,7 +1360,9 @@ app.delete('/api/ai/chat/:puuid', (req, res) => {
 // AI Year-End Summary endpoint (updated to use new format)
 app.post('/api/ai/year-end-summary', async (req, res) => {
   try {
-    if (!BEDROCK_LAMBDA_URL) {
+    const bedrockUrl = getBedrockLambdaUrl();
+    if (!bedrockUrl) {
+      console.error('[AI Year-End Summary] BEDROCK_LAMBDA_URL not configured');
       return res.status(500).json({
         error: 'Bedrock Lambda URL not configured',
         details: 'Set BEDROCK_LAMBDA_URL environment variable'
@@ -1361,7 +1391,7 @@ app.post('/api/ai/year-end-summary', async (req, res) => {
     const playerName = `${dataToSend.playerInfo.gameName || gameName || ''}#${dataToSend.playerInfo.tagLine || tagLine || ''}`;
     console.log(`🎉 [AI] Generating year-end summary for ${playerName}`);
     
-    const response = await axios.post(BEDROCK_LAMBDA_URL, {
+    const response = await axios.post(bedrockUrl, {
       playerData: dataToSend,
       analysisType: 'summary'
     }, {
@@ -1404,7 +1434,7 @@ app.get('/health', (req, res) => {
       hasCookies: Object.keys(sessionData.cookies).length > 0,
       isValid: sessionData.isValid,
       lastUpdated: sessionData.lastUpdated,
-      bedrockConfigured: !!BEDROCK_LAMBDA_URL
+      bedrockConfigured: !!getBedrockLambdaUrl()
     }
   });
 });
@@ -1545,8 +1575,9 @@ async function initializeServer() {
     console.log(`   GET  /api/regions - Available regions`);
     console.log(`   GET  /api/docs/riot-id-workflow - Documentation for Riot ID workflow`);
     console.log(`\n🤖 AI ENDPOINTS (Amazon Bedrock):`);
-    if (BEDROCK_LAMBDA_URL) {
-      console.log(`   ✅ Bedrock Lambda URL: ${BEDROCK_LAMBDA_URL.substring(0, 60)}...`);
+    const startupBedrockUrl = getBedrockLambdaUrl();
+    if (startupBedrockUrl) {
+      console.log(`   ✅ Bedrock Lambda URL: ${startupBedrockUrl.substring(0, 60)}...`);
       console.log(`   POST /api/ai/analyze - Generate AI insights from player data`);
       console.log(`   POST /api/ai/dashboard-insights - Comprehensive dashboard analysis`);
       console.log(`   POST /api/ai/chat - Conversational Q&A with history`);
