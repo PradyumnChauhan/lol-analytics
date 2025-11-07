@@ -18,8 +18,35 @@ export async function GET(
     const platform = regionToPlatform[region] || 'na1';
     const backendUrl = getBackendUrl();
 
+    // Helper function to create timeout signal
+    const createTimeoutSignal = (timeoutMs: number): AbortSignal => {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), timeoutMs);
+      return controller.signal;
+    };
+
+    // Helper function to fetch with retry and better error handling
+    const fetchWithRetry = async (url: string, retries = 2): Promise<Response> => {
+      for (let i = 0; i <= retries; i++) {
+        try {
+          const response = await fetch(url, {
+            headers: {
+              'Connection': 'keep-alive',
+            },
+            signal: createTimeoutSignal(30000), // 30 second timeout
+          });
+          return response;
+        } catch (error) {
+          if (i === retries) throw error;
+          // Wait before retry (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+        }
+      }
+      throw new Error('Failed to fetch after retries');
+    };
+
     // Step 1: Get account by Riot ID
-    const accountResponse = await fetch(
+    const accountResponse = await fetchWithRetry(
       `${backendUrl}/api/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}?region=${region}`
     );
     if (!accountResponse.ok) {
@@ -31,7 +58,7 @@ export async function GET(
     const account = await accountResponse.json();
 
     // Step 2: Get summoner data
-    const summonerResponse = await fetch(
+    const summonerResponse = await fetchWithRetry(
       `${backendUrl}/api/summoner/v4/summoners/by-puuid/${account.puuid}?region=${platform}&autoDetect=true`
     );
     if (!summonerResponse.ok) {
@@ -43,7 +70,7 @@ export async function GET(
     const summoner = await summonerResponse.json();
 
     // Step 3: Get live game data
-    const liveGameResponse = await fetch(
+    const liveGameResponse = await fetchWithRetry(
       `${backendUrl}/api/spectator/v5/active-games/by-summoner/${summoner.id}?region=${platform}`
     );
     

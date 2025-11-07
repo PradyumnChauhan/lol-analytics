@@ -6,6 +6,24 @@ frontend:
         - npm ci
     build:
       commands:
+        # Debug: Check if environment variables are available
+        - echo "Checking environment variables..."
+        - |
+          if [ -z "$NEXT_PUBLIC_BACKEND_URL" ]; then
+            echo "⚠️  WARNING: NEXT_PUBLIC_BACKEND_URL is not set in Amplify environment variables"
+            echo "Please set it in: App Settings > Environment Variables"
+          else
+            echo "✅ NEXT_PUBLIC_BACKEND_URL is set: $NEXT_PUBLIC_BACKEND_URL"
+          fi
+        # Export all NEXT_PUBLIC_ environment variables to .env.production
+        # This is required for Next.js to access them at runtime
+        - echo "Exporting NEXT_PUBLIC_ environment variables to .env.production..."
+        - env | grep -E '^NEXT_PUBLIC_' > .env.production || echo "# No NEXT_PUBLIC_ variables found" > .env.production
+        # Verify the file was created
+        - echo "Contents of .env.production:"
+        - cat .env.production || echo "File not created"
+        # Build the Next.js application
+        - echo "Building Next.js application..."
         - npm run build
   artifacts:
     baseDirectory: .next
