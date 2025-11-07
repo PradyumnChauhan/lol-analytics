@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { AIDataPayload } from '@/lib/ai/data-aggregator';
-import { getBackendUrl } from '@/lib/utils/backend-url';
+import type { InsightCard, DashboardInsightsResponse } from '@/lib/ai/types';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -11,15 +11,15 @@ export interface ChatMessage {
 }
 
 export interface DashboardInsights {
-  insights: string;
+  insights: string | InsightCard[] | DashboardInsightsResponse;
   analysisType: string;
   matchesAnalyzed: number;
   model?: string;
   prompt?: string;
   promptMetadata?: {
     promptLength: number;
-    modelUsed: string;
-    maxTokens: number;
+    modelUsed?: string;
+    maxTokens?: number;
   };
 }
 
@@ -73,7 +73,8 @@ export function useAIAnalytics(): UseAIAnalyticsReturn {
     setError(null);
 
     try {
-      const response = await fetch(`${getBackendUrl()}/api/ai/dashboard-insights`, {
+      // Use Next.js API route to proxy the request (avoids mixed-content issues)
+      const response = await fetch('/api/ai/dashboard-insights', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -87,16 +88,41 @@ export function useAIAnalytics(): UseAIAnalyticsReturn {
       }
 
       const data = await response.json();
-      const insights: DashboardInsights = {
-        insights: data.insights,
-        analysisType: data.analysisType,
-        matchesAnalyzed: data.matchesAnalyzed || 0,
-        model: data.model,
-        prompt: data.prompt,  // Include prompt
-        promptMetadata: data.promptMetadata,
-      };
-
-      // Prompt data is included in response but not logged to console
+      
+      // Handle both structured and legacy response formats
+      let insights: DashboardInsights;
+      
+      if (data.insights && Array.isArray(data.insights)) {
+        // Structured format with insight cards
+        insights = {
+          insights: data.insights as InsightCard[],
+          analysisType: data.analysisType || 'dashboard',
+          matchesAnalyzed: data.matchesAnalyzed || 0,
+          model: data.model,
+          prompt: data.prompt,
+          promptMetadata: data.promptMetadata,
+        };
+      } else if (typeof data.insights === 'string') {
+        // Legacy text format
+        insights = {
+          insights: data.insights,
+          analysisType: data.analysisType || 'dashboard',
+          matchesAnalyzed: data.matchesAnalyzed || 0,
+          model: data.model,
+          prompt: data.prompt,
+          promptMetadata: data.promptMetadata,
+        };
+      } else {
+        // Fallback: treat as structured response object
+        insights = {
+          insights: data as DashboardInsightsResponse,
+          analysisType: data.analysisType || 'dashboard',
+          matchesAnalyzed: data.matchesAnalyzed || 0,
+          model: data.model,
+          prompt: data.prompt,
+          promptMetadata: data.promptMetadata,
+        };
+      }
 
       setDashboardInsights(insights);
       insightsCache.set(cacheKey, { data: insights, timestamp: Date.now() });
@@ -136,7 +162,8 @@ export function useAIAnalytics(): UseAIAnalyticsReturn {
     setChatHistory((prev) => [...prev, userMessage]);
 
     try {
-      const response = await fetch(`${getBackendUrl()}/api/ai/chat`, {
+      // Use Next.js API route to proxy the request (avoids mixed-content issues)
+      const response = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -191,7 +218,8 @@ export function useAIAnalytics(): UseAIAnalyticsReturn {
     setError(null);
 
     try {
-      const response = await fetch(`${getBackendUrl()}/api/ai/year-end-summary`, {
+      // Use Next.js API route to proxy the request (avoids mixed-content issues)
+      const response = await fetch('/api/ai/year-end-summary', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

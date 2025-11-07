@@ -234,6 +234,53 @@ export const handler = async (event) => {
             throw new Error(`Failed to parse DeepSeek response: ${parseError.message}`);
         }
         
+        // For dashboard analysis, try to parse structured JSON
+        let structuredInsights = null;
+        if (analysisType === 'dashboard') {
+            try {
+                // Try to extract JSON from markdown code blocks if present
+                let jsonText = aiInsights.trim();
+                
+                // Remove markdown code blocks if present
+                const jsonMatch = jsonText.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
+                if (jsonMatch) {
+                    jsonText = jsonMatch[1];
+                }
+                
+                // Try to find JSON object in the text
+                const jsonObjectMatch = jsonText.match(/\{[\s\S]*\}/);
+                if (jsonObjectMatch) {
+                    jsonText = jsonObjectMatch[0];
+                }
+                
+                structuredInsights = JSON.parse(jsonText);
+                
+                // Validate structure
+                if (structuredInsights && Array.isArray(structuredInsights.insights)) {
+                    console.log(`✅ [BEDROCK] Successfully parsed structured insights with ${structuredInsights.insights.length} cards`);
+                    
+                    // Filter out unavailable insights
+                    structuredInsights.insights = structuredInsights.insights.filter(insight => insight.available !== false);
+                    console.log(`✅ [BEDROCK] Filtered to ${structuredInsights.insights.length} available insight cards`);
+                    
+                    // Add metadata
+                    structuredInsights.analysisType = analysisType;
+                    structuredInsights.matchesAnalyzed = finalPlayerData.recentMatches?.length || 0;
+                    structuredInsights.model = modelId;
+                    structuredInsights.prompt = prompt;
+                    structuredInsights.promptMetadata = {
+                        promptLength: prompt.length
+                    };
+                } else {
+                    console.warn('⚠️ [BEDROCK] Structured response missing required fields, falling back to legacy format');
+                    structuredInsights = null;
+                }
+            } catch (jsonError) {
+                console.warn('⚠️ [BEDROCK] Failed to parse structured JSON, falling back to legacy format:', jsonError.message);
+                structuredInsights = null;
+            }
+        }
+        
         // Log the prompt for debugging (also return it)
         console.log('📝 [BEDROCK] Prompt sent to DeepSeek V3.1:');
         console.log('─────────────────────────────────────────');
@@ -241,23 +288,36 @@ export const handler = async (event) => {
         console.log('─────────────────────────────────────────');
         console.log(`Model: ${modelId}, Max Tokens: ${maxTokens}, Temperature: ${bedrockRequest.temperature}`);
         
-        return {
-            statusCode: 200,
-            headers: {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
-            body: JSON.stringify({
-                insights: aiInsights,
-                analysisType: analysisType,
-                matchesAnalyzed: finalPlayerData.recentMatches?.length || 0,
-                model: modelId,
-                prompt: prompt,  // Include prompt in response
-                promptLength: prompt.length,
-                modelUsed: modelId,
-                maxTokens: maxTokens
-            })
-        };
+        // Return structured response if available, otherwise legacy format
+        if (structuredInsights) {
+            return {
+                statusCode: 200,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                },
+                body: JSON.stringify(structuredInsights)
+            };
+        } else {
+            // Legacy format for backward compatibility
+            return {
+                statusCode: 200,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                },
+                body: JSON.stringify({
+                    insights: aiInsights,
+                    analysisType: analysisType,
+                    matchesAnalyzed: finalPlayerData.recentMatches?.length || 0,
+                    model: modelId,
+                    prompt: prompt,  // Include prompt in response
+                    promptLength: prompt.length,
+                    modelUsed: modelId,
+                    maxTokens: maxTokens
+                })
+            };
+        }
         
     } catch (error) {
         console.error('❌ [LAMBDA] Error:', error);
@@ -345,7 +405,30 @@ function buildPrompt(playerData, analysisType, question = '', conversationHistor
     const bestClashResult = clash.bestResult;
     
     if (analysisType === 'dashboard') {
-        return `Analyze ${gameName}#${tagLine}'s League of Legends performance data. Write a personalized, direct analysis addressing them with "you" and "your" throughout. Do NOT include generic openings like "Of course", "Here is", or "Here's". Start directly with the analysis.
+        // Check data availability for each insight type
+        const hasMatchData = totalGames >= 5;
+        const hasChampionData = topChampions.length > 0;
+        const hasRankedData = !!(soloQueue || flexQueue);
+        const hasChallengeData = !!challengePoints;
+        const hasClashData = tournamentsParticipated > 0;
+        const trends = matchStats.trends || {};
+        const hasTrendData = Array.isArray(trends.winRateLast30Days) && trends.winRateLast30Days.length > 0;
+        
+        // Build role stats from recent matches
+        const roleStats = {};
+        if (Array.isArray(recentMatches) && recentMatches.length > 0) {
+            recentMatches.forEach(match => {
+                const role = match.role || match.teamPosition || 'UNKNOWN';
+                if (!roleStats[role]) {
+                    roleStats[role] = { games: 0, wins: 0 };
+                }
+                roleStats[role].games++;
+                if (match.win) roleStats[role].wins++;
+            });
+        }
+        const hasRoleData = Object.keys(roleStats).length > 0;
+        
+        return `Analyze ${gameName}#${tagLine}'s League of Legends performance data and return a structured JSON response with multiple insight cards.
 
 Player: ${gameName}#${tagLine} (Level ${level}, ${region})
 ${soloQueue ? `Rank: ${soloQueue.tier} ${soloQueue.rank} (${soloQueue.leaguePoints} LP)` : ''}
@@ -356,6 +439,9 @@ PERFORMANCE SUMMARY:
 - Average KDA: ${avgKDA.kills.toFixed(1)}/${avgKDA.deaths.toFixed(1)}/${avgKDA.assists.toFixed(1)}
 - Average Damage: ${avgDamage.toFixed(0)}
 - Average Vision Score: ${avgVision.toFixed(1)}
+${hasTrendData ? `- Win Rate Trend (last 30 days): ${JSON.stringify(trends.winRateLast30Days || [])}` : ''}
+${hasTrendData ? `- KDA Trend (last 30 days): ${JSON.stringify(trends.kdaLast30Days || [])}` : ''}
+${hasTrendData ? `- Damage Trend (last 30 days): ${JSON.stringify(trends.damageLast30Days || [])}` : ''}
 
 CHAMPION MASTERY:
 - Total Mastery Score: ${totalMasteryScore.toLocaleString()}
@@ -373,6 +459,12 @@ ${topChampions.length > 0 ? topChampions.map(c => {
 RECENT MATCHES (Last ${recentMatches.length}):
 ${formatRecentMatches(recentMatches)}
 
+ROLE PERFORMANCE:
+${hasRoleData ? Object.entries(roleStats).map(([role, stats]) => {
+    const wr = stats.games > 0 ? ((stats.wins / stats.games) * 100).toFixed(1) : '0';
+    return `  - ${role}: ${stats.games} games, ${stats.wins}W-${stats.games - stats.wins}L (${wr}% WR)`;
+}).join('\n') : '  No role data available'}
+
 ${challengePoints ? formatChallengesSection(challenges) : ''}
 
 ${(soloQueue || flexQueue) ? formatRankedSection(ranked) : ''}
@@ -381,23 +473,138 @@ ${tournamentsParticipated > 0 ? formatClashSection(clash) : ''}
 
 ${formatInsightsSection(insights)}
 
-Provide a detailed, personalized analysis. Write directly to the player using "you" and "your". Reference specific champions, matches, and stats from their data. Be specific and actionable.
+CRITICAL: You MUST return ONLY valid JSON, no markdown, no code blocks, no explanations. The response must be a JSON object with this exact structure:
 
-Structure your analysis with these sections (use markdown headers):
-1. **Key Strengths** - Identify top 3 strengths with specific examples from their recent matches and champion performance. Reference exact champions, KDA ratios, and win rates.
-2. **Areas for Improvement** - Identify top 3 improvement areas with specific metrics and examples from their gameplay. Reference specific matches where issues occurred.
-3. **Playstyle Analysis** - Analyze their playstyle (aggressive/defensive/team-oriented) based on their stats, champion picks, and performance patterns.
-4. **Champion Pool Insights** - Provide specific recommendations about their champion pool. Reference their mastery data, win rates, and suggest which champions to focus on or avoid.
-5. **Role Recommendations** - Based on their performance across roles, recommend their best roles and explain why.
-6. **Improvement Roadmap** - Provide 5 prioritized, actionable steps with specific metrics and goals. Use P1, P2, etc. for priorities.
-7. **Overall Performance Rating** - Give a 1-10 rating with detailed justification based on their rank, stats, and performance patterns.
+{
+  "insights": [
+    {
+      "type": "match_performance",
+      "title": "Match Performance Analysis",
+      "textInsights": "Write 2-3 paragraphs analyzing their match performance, win rate trends, recent form, and overall consistency. Use 'you' and 'your' throughout.",
+      "visualData": {
+        "chartType": "line",
+        "data": ${hasTrendData ? JSON.stringify(trends.winRateLast30Days.map((wr, i) => ({ date: `Day ${i + 1}`, value: wr }))) : '[]'},
+        "labels": ${hasTrendData ? JSON.stringify(trends.winRateLast30Days.map((_, i) => `Day ${i + 1}`)) : '[]'}
+      },
+      "available": ${hasMatchData}
+    },
+    {
+      "type": "champion_mastery",
+      "title": "Champion Mastery & Performance",
+      "textInsights": "Write 2-3 paragraphs about their champion pool, mastery distribution, top performing champions, and recommendations.",
+      "visualData": {
+        "chartType": "bar",
+        "data": ${hasChampionData ? JSON.stringify(topChampions.slice(0, 8).map(c => ({ name: c.championName || `Champ_${c.championId}`, value: c.winRate || 0 }))) : '[]'},
+        "labels": ${hasChampionData ? JSON.stringify(topChampions.slice(0, 8).map(c => c.championName || `Champ_${c.championId}`)) : '[]'}
+      },
+      "available": ${hasChampionData}
+    },
+    {
+      "type": "ranked_progression",
+      "title": "Ranked Progression",
+      "textInsights": "Write 2-3 paragraphs about their ranked status, progression, and goals.",
+      "visualData": {
+        "chartType": "progress",
+        "data": ${hasRankedData ? JSON.stringify([{ label: soloQueue ? `${soloQueue.tier} ${soloQueue.rank}` : 'Unranked', value: soloQueue ? soloQueue.leaguePoints : 0, max: 100 }]) : '[]'}
+      },
+      "available": ${hasRankedData}
+    },
+    {
+      "type": "challenges_achievements",
+      "title": "Challenges & Achievements",
+      "textInsights": "Write 2-3 paragraphs about their challenge progress, achievements, and milestones.",
+      "visualData": {
+        "chartType": "pie",
+        "data": ${hasChallengeData ? JSON.stringify(Object.entries(categoryPoints).map(([key, val]) => ({ name: key, value: typeof val === 'number' ? val : 0 }))) : '[]'},
+        "labels": ${hasChallengeData ? JSON.stringify(Object.keys(categoryPoints)) : '[]'}
+      },
+      "available": ${hasChallengeData}
+    },
+    {
+      "type": "role_performance",
+      "title": "Role Performance Analysis",
+      "textInsights": "Write 2-3 paragraphs analyzing their performance across different roles, strengths, and role-specific recommendations.",
+      "visualData": {
+        "chartType": "bar",
+        "data": ${hasRoleData ? JSON.stringify(Object.entries(roleStats).map(([role, stats]) => ({ name: role, value: stats.games > 0 ? ((stats.wins / stats.games) * 100) : 0 }))) : '[]'},
+        "labels": ${hasRoleData ? JSON.stringify(Object.keys(roleStats)) : '[]'}
+      },
+      "available": ${hasRoleData}
+    },
+    {
+      "type": "kda_damage_trends",
+      "title": "KDA & Damage Trends",
+      "textInsights": "Write 2-3 paragraphs about their KDA trends, damage output patterns, and performance consistency.",
+      "visualData": {
+        "chartType": "line",
+        "data": ${hasTrendData ? JSON.stringify(trends.kdaLast30Days.map((kda, i) => ({ date: `Day ${i + 1}`, value: kda }))) : '[]'},
+        "labels": ${hasTrendData ? JSON.stringify(trends.kdaLast30Days.map((_, i) => `Day ${i + 1}`)) : '[]'}
+      },
+      "available": ${hasTrendData}
+    },
+    {
+      "type": "vision_map_control",
+      "title": "Vision & Map Control",
+      "textInsights": "Write 2-3 paragraphs about their vision score, map control, and warding habits.",
+      "visualData": {
+        "chartType": "bar",
+        "data": ${hasMatchData ? JSON.stringify([{ name: 'Avg Vision', value: avgVision }]) : '[]'},
+        "labels": ${hasMatchData ? JSON.stringify(['Average Vision Score']) : '[]'}
+      },
+      "available": ${hasMatchData}
+    },
+    {
+      "type": "clash_tournament",
+      "title": "Clash & Tournament Results",
+      "textInsights": "Write 2-3 paragraphs about their tournament participation, best results, and team play.",
+      "visualData": {
+        "chartType": "progress",
+        "data": ${hasClashData ? JSON.stringify([{ label: 'Tournaments', value: tournamentsParticipated, max: 10 }]) : '[]'}
+      },
+      "available": ${hasClashData}
+    },
+    {
+      "type": "overall_performance_rating",
+      "title": "Overall Performance Rating",
+      "textInsights": "Write 2-3 paragraphs providing an overall 1-10 rating with detailed justification based on rank, stats, and performance patterns.",
+      "visualData": {
+        "chartType": "radar",
+        "data": ${hasMatchData ? JSON.stringify([
+          { metric: 'Win Rate', value: winRate, max: 100 },
+          { metric: 'KDA', value: avgKDA.deaths > 0 ? ((avgKDA.kills + avgKDA.assists) / avgKDA.deaths) : (avgKDA.kills + avgKDA.assists), max: 5 },
+          { metric: 'Damage', value: Math.min(avgDamage / 1000, 50), max: 50 },
+          { metric: 'Vision', value: Math.min(avgVision, 100), max: 100 }
+        ]) : '[]'},
+        "labels": ${hasMatchData ? JSON.stringify(['Win Rate', 'KDA', 'Damage', 'Vision']) : '[]'}
+      },
+      "available": ${hasMatchData}
+    },
+    {
+      "type": "improvement_roadmap",
+      "title": "Improvement Roadmap",
+      "textInsights": "Write 2-3 paragraphs with 5 prioritized, actionable steps (P1-P5) with specific metrics and goals for improvement.",
+      "visualData": {
+        "chartType": "bar",
+        "data": ${hasMatchData ? JSON.stringify([
+          { name: 'P1', value: 5 },
+          { name: 'P2', value: 4 },
+          { name: 'P3', value: 3 },
+          { name: 'P4', value: 2 },
+          { name: 'P5', value: 1 }
+        ]) : '[]'},
+        "labels": ${hasMatchData ? JSON.stringify(['Priority 1', 'Priority 2', 'Priority 3', 'Priority 4', 'Priority 5']) : '[]'}
+      },
+      "available": ${hasMatchData}
+    }
+  ]
+}
 
 IMPORTANT:
-- Start immediately with the analysis title. No pleasantries or generic openings.
-- Use "you" and "your" throughout - write directly to the player.
-- Reference specific champions by name (not Champion_ID), specific match results, and exact stats.
-- Be direct, specific, and actionable.
-- Use markdown formatting for headers and bullet points.
+- Return ONLY the JSON object, no markdown code blocks, no explanations
+- Set "available": false for insight types where insufficient data exists
+- Write personalized text insights using "you" and "your" throughout
+- Reference specific champions, matches, and stats
+- Be direct, specific, and actionable
 `;
     } else if (analysisType === 'chat') {
         // Classify question type

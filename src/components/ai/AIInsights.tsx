@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Brain, Sparkles, TrendingUp, Loader2, Share2, Copy } from 'lucide-react';
-import { getBackendUrl } from '@/lib/utils/backend-url';
 
 interface MatchData {
   [key: string]: unknown;
@@ -34,11 +33,12 @@ export function AIInsights({ matchData, playerStats, gameName, tagLine }: AIInsi
     setError(null);
     
     try {
-      const endpoint = type === 'summary' 
+      // Use Next.js API route to proxy the request (avoids mixed-content issues)
+      const nextApiEndpoint = type === 'summary' 
         ? '/api/ai/year-end-summary'
         : '/api/ai/analyze';
       
-      const response = await fetch(`${getBackendUrl()}${endpoint}`, {
+      const response = await fetch(nextApiEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

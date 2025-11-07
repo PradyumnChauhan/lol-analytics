@@ -1,3 +1,6 @@
+// Load environment variables from .env file if it exists
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
@@ -1057,6 +1060,15 @@ app.get('/api/match/v5/matches/:matchId/timeline', async (req, res) => {
 // Requires BEDROCK_LAMBDA_URL environment variable
 const BEDROCK_LAMBDA_URL = process.env.BEDROCK_LAMBDA_URL || '';
 
+// Log Bedrock configuration status on startup
+if (!BEDROCK_LAMBDA_URL) {
+  console.log('⚠️  BEDROCK_LAMBDA_URL not configured - AI endpoints will be disabled');
+  console.log('   Set BEDROCK_LAMBDA_URL environment variable or add it to .env file');
+  console.log('   Example: BEDROCK_LAMBDA_URL=https://your-lambda-function-url.lambda-url.region.on.aws/');
+} else {
+  console.log(`✅ BEDROCK_LAMBDA_URL configured: ${BEDROCK_LAMBDA_URL.substring(0, 50)}...`);
+}
+
 // Conversation history storage (in-memory, keyed by puuid)
 // In production, use Redis or DynamoDB for persistence
 const conversationHistory = new Map();
@@ -1533,11 +1545,17 @@ async function initializeServer() {
     console.log(`   GET  /api/regions - Available regions`);
     console.log(`   GET  /api/docs/riot-id-workflow - Documentation for Riot ID workflow`);
     console.log(`\n🤖 AI ENDPOINTS (Amazon Bedrock):`);
-    console.log(`   POST /api/ai/analyze - Generate AI insights from player data`);
-    console.log(`   POST /api/ai/dashboard-insights - Comprehensive dashboard analysis`);
-    console.log(`   POST /api/ai/chat - Conversational Q&A with history`);
-    console.log(`   DELETE /api/ai/chat/:puuid - Clear conversation history`);
-    console.log(`   POST /api/ai/year-end-summary - Generate year-end summary`);
+    if (BEDROCK_LAMBDA_URL) {
+      console.log(`   ✅ Bedrock Lambda URL: ${BEDROCK_LAMBDA_URL.substring(0, 60)}...`);
+      console.log(`   POST /api/ai/analyze - Generate AI insights from player data`);
+      console.log(`   POST /api/ai/dashboard-insights - Comprehensive dashboard analysis`);
+      console.log(`   POST /api/ai/chat - Conversational Q&A with history`);
+      console.log(`   DELETE /api/ai/chat/:puuid - Clear conversation history`);
+      console.log(`   POST /api/ai/year-end-summary - Generate year-end summary`);
+    } else {
+      console.log(`   ❌ Bedrock Lambda URL not configured - AI endpoints disabled`);
+      console.log(`   Set BEDROCK_LAMBDA_URL environment variable to enable`);
+    }
   });
 }
 
