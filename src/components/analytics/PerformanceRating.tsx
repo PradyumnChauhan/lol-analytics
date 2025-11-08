@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Trophy, TrendingUp, Target, Eye, Users } from 'lucide-react';
+import { Trophy, Target } from 'lucide-react';
 import { PerformanceGrade, PerformanceMetrics } from '@/lib/match-analytics';
 
 interface PerformanceRatingProps {
@@ -40,21 +40,22 @@ export function PerformanceRating({
   comparison, 
   className = '' 
 }: PerformanceRatingProps) {
-  const _getGradeIcon = (grade: PerformanceGrade) => {
-    switch (grade) {
-      case 'S+':
-      case 'S':
-        return <Trophy className="h-8 w-8 text-yellow-400" />;
-      case 'A':
-        return <Target className="h-8 w-8 text-green-400" />;
-      case 'B':
-        return <TrendingUp className="h-8 w-8 text-blue-400" />;
-      case 'C':
-        return <Eye className="h-8 w-8 text-orange-400" />;
-      case 'D':
-        return <Users className="h-8 w-8 text-red-400" />;
-    }
-  };
+  // Unused function - kept for potential future use
+  // const _getGradeIcon = (grade: PerformanceGrade) => {
+  //   switch (grade) {
+  //     case 'S+':
+  //     case 'S':
+  //       return <Trophy className="h-8 w-8 text-yellow-400" />;
+  //     case 'A':
+  //       return <Target className="h-8 w-8 text-green-400" />;
+  //     case 'B':
+  //       return <TrendingUp className="h-8 w-8 text-blue-400" />;
+  //     case 'C':
+  //       return <Eye className="h-8 w-8 text-orange-400" />;
+  //     case 'D':
+  //       return <Users className="h-8 w-8 text-red-400" />;
+  //   }
+  // };
 
   const getGradeBackground = (grade: PerformanceGrade) => {
     return `bg-gradient-to-br ${gradeColors[grade]} text-white`;

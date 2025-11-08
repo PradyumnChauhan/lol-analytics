@@ -54,7 +54,7 @@ export function ObjectiveTimeline({ match, playerPuuid, className = '' }: Object
 
   const teamId = participant.teamId;
   const gameStartTime = match.info.gameStartTimestamp ?? 0;
-  const gameDuration = match.info.gameDuration ?? 0;
+  // const gameDuration = match.info.gameDuration ?? 0;
 
   // Extract objective events from match data
   const objectives: ObjectiveEvent[] = [];

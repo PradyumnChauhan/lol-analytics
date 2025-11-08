@@ -507,7 +507,7 @@ function calculatePerformanceGrade(
   visionScore: number = 0,
   csPerMinute: number = 0,
   killParticipation: number = 0,
-  _multikills: number = 0
+  _multikills: number = 0 // eslint-disable-line @typescript-eslint/no-unused-vars
 ): string {
   let score = 0;
   

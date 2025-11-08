@@ -26,7 +26,7 @@ export function calculatePerformanceGrade(
   visionScore: number = 0,
   csPerMinute: number = 0,
   killParticipation: number = 0,
-  multikills: number = 0
+  multikills: number = 0 // eslint-disable-line @typescript-eslint/no-unused-vars
 ): PerformanceGrade {
   // Weighted scoring system
   let score = 0;
@@ -128,7 +128,7 @@ export function calculateVisionRating(participant: ParticipantDto): number {
   const wardsPlaced = participant.wardsPlaced || 0;
   const wardsKilled = participant.wardsKilled || 0;
   const controlWardsBought = participant.visionWardsBoughtInGame || 0;
-  const detectorWardsPlaced = participant.detectorWardsPlaced || 0;
+  // const detectorWardsPlaced = participant.detectorWardsPlaced || 0;
   
   // Weighted vision rating (0-100)
   let rating = 0;

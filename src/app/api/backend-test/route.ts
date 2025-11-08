@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getBackendUrl } from '@/lib/utils/backend-url';
 
 /**
  * Test endpoint to verify backend connectivity
  * Access at: /api/backend-test
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const backendUrl = getBackendUrl();
     

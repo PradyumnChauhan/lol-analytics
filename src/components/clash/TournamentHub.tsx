@@ -33,7 +33,7 @@ interface TournamentHubProps {
   isLoading?: boolean;
 }
 
-export function TournamentHub({ playerPuuid: _playerPuuid, region = 'na1', isLoading }: TournamentHubProps) {
+export function TournamentHub({ playerPuuid: _playerPuuid, region = 'na1', isLoading }: TournamentHubProps) { // eslint-disable-line @typescript-eslint/no-unused-vars
   const [tournaments, setTournaments] = useState<TournamentWithStatus[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

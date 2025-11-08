@@ -41,12 +41,12 @@ export async function GET(
     // If it's a platform, convert to routing region; otherwise use as-is
     region = platformToRoutingRegion[inputRegion] || inputRegion;
     
-    const regionToPlatform: Record<string, string> = {
-      'americas': 'na1',
-      'asia': 'kr',
-      'europe': 'euw1',
-    };
-    const platform = regionToPlatform[region] || 'na1';
+    // Platform mapping kept for potential future use
+    // const regionToPlatform: Record<string, string> = {
+    //   'americas': 'na1',
+    //   'asia': 'kr',
+    //   'europe': 'euw1',
+    // };
 
     const backendUrl = getBackendUrl();
     
@@ -58,7 +58,7 @@ export async function GET(
     };
 
     // Helper function to fetch with retry
-    const fetchWithRetry = async (url: string, retries = 2, endpointName = 'unknown'): Promise<Response> => {
+    const fetchWithRetry = async (url: string, retries = 2): Promise<Response> => {
       const fullUrl = url.startsWith('http') ? url : `${backendUrl}${url.startsWith('/') ? url : '/' + url}`;
       
       for (let i = 0; i <= retries; i++) {
@@ -92,8 +92,7 @@ export async function GET(
     // Step 1: Get account by Riot ID
     const accountResponse = await fetchWithRetry(
       `${backendUrl}/api/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}?region=${region}`,
-      2,
-      'AccountByRiotId'
+      2
     );
     if (!accountResponse.ok) {
       return NextResponse.json(
@@ -107,8 +106,7 @@ export async function GET(
     // Fetch one extra to check if there are more matches available
     const matchIdsResponse = await fetchWithRetry(
       `${backendUrl}/api/match/v5/matches/by-puuid/${account.puuid}/ids?region=${region}&count=${start + count + 1}`,
-      2,
-      'MatchIds'
+      2
     );
     const allMatchIds = matchIdsResponse.ok ? await matchIdsResponse.json() : [];
     

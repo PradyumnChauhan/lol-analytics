@@ -8,13 +8,12 @@ import {
   Brain, 
   Trophy,
   BarChart3,
-  Activity,
   Eye,
   Users,
   Star
 } from 'lucide-react';
 import { VisualizationRenderer } from './visualizations/VisualizationRenderer';
-import type { InsightCard, DashboardInsightsResponse, LegacyDashboardInsights } from '@/lib/ai/types';
+import type { InsightCard, DashboardInsightsResponse } from '@/lib/ai/types';
 
 interface AIDashboardInsightsProps {
   insights: string | InsightCard[] | DashboardInsightsResponse;

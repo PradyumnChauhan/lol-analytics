@@ -258,7 +258,7 @@ export class ClashAPI {
   async createTeam(
     puuid: string, 
     teamData: { name: string; tag: string; iconId: number; iconColorId: number }, 
-    region: string = 'na1'
+    _region: string = 'na1' // eslint-disable-line @typescript-eslint/no-unused-vars
   ): Promise<ClashTeam> {
     // Mock implementation - in real app would call API
     const newTeam: ClashTeam = {
@@ -498,7 +498,7 @@ export class ClashUtils {
    * Format tournament schedule time
    */
   static formatTournamentTime(timestamp: number): string {
-    const date = new Date(timestamp);
+    // const date = new Date(timestamp);
     const now = new Date();
     const diff = timestamp - now.getTime();
     
@@ -589,7 +589,7 @@ export class ClashUtils {
    * Generate prize pool estimate based on tournament tier
    */
   static estimatePrizePool(tournament: Tournament): string {
-    const theme = this.getTournamentTheme(tournament.themeId);
+    // const theme = this.getTournamentTheme(tournament.themeId);
     
     // Simple prize pool estimation (would need actual data from API)
     switch (tournament.themeId) {
@@ -624,7 +624,7 @@ export class ClashUtils {
   /**
    * Calculate team statistics
    */
-  static calculateTeamStats(team: ClashTeam): { wins: number; losses: number; tournaments: number } {
+  static calculateTeamStats(_team: ClashTeam): { wins: number; losses: number; tournaments: number } { // eslint-disable-line @typescript-eslint/no-unused-vars
     // Mock implementation - would calculate from actual match history
     return {
       wins: Math.floor(Math.random() * 20),

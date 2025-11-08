@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Filter, X, Search, Calendar, SortAsc, SortDesc } from 'lucide-react';
+import { Filter, X, Search, SortAsc, SortDesc } from 'lucide-react';
 
 export interface MatchFilter {
   queueType: string;

@@ -2,7 +2,6 @@
 
 import { useParams, useRouter } from "next/navigation"
 import React, { useState, useEffect, useCallback, Suspense, useMemo } from "react"
-import { getBackendUrl } from "@/lib/utils/backend-url"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"

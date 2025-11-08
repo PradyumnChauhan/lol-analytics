@@ -317,7 +317,7 @@ function getCommonDeathAreas(heatmap: Array<{ intensity: number }>): string[] {
   );
 }
 
-function getSafeAreas(_heatmap: Array<{ intensity: number }>): string[] {
+function getSafeAreas(_heatmap: Array<{ intensity: number }>): string[] { // eslint-disable-line @typescript-eslint/no-unused-vars
   const safeAreas = [
     'Base area - safest location',
     'Warded jungle - good vision',

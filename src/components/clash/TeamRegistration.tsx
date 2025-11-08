@@ -70,7 +70,7 @@ const TIER_COLORS = {
 export function TeamRegistration({ 
   playerPuuid, 
   region = 'na1', 
-  tournamentId: _tournamentId,
+  tournamentId: _tournamentId, // eslint-disable-line @typescript-eslint/no-unused-vars
   onTeamCreated,
   onTeamJoined 
 }: TeamRegistrationProps) {

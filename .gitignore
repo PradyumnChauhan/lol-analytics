@@ -31,6 +31,7 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
+
 # vercel
 .vercel
 
@@ -41,6 +42,7 @@ next-env.d.ts
 # Backend
 backend/config/riot-config.json
 backend/.env
+lol-analytics/.env
 backend/node_modules
 
 # Development files

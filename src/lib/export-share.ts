@@ -83,9 +83,9 @@ class ExportShareService {
 
   // Create shareable profile
   async createShareableProfile(
-    _summonerData: unknown,
-    _matchHistory: unknown[],
-    _statsData: unknown
+    _summonerData: unknown, // eslint-disable-line @typescript-eslint/no-unused-vars
+    _matchHistory: unknown[], // eslint-disable-line @typescript-eslint/no-unused-vars
+    _statsData: unknown // eslint-disable-line @typescript-eslint/no-unused-vars
   ): Promise<ShareableProfile> {
     // Process the data into a shareable format
     const mockProfile: ShareableProfile = {
@@ -219,12 +219,12 @@ class ExportShareService {
   }
 
   // Generate image share (would require canvas/image generation library)
-  async generateShareImage(_profile: ShareableProfile): Promise<string> {
+  async generateShareImage(_profile: ShareableProfile): Promise<string> { // eslint-disable-line @typescript-eslint/no-unused-vars
     // Mock implementation - would generate actual image
     return `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==`;
   }
 
-  private processMatchHistory(_matches: unknown[]): Array<{
+  private processMatchHistory(_matches: unknown[]): Array<{ // eslint-disable-line @typescript-eslint/no-unused-vars
     matchId: string;
     champion: string;
     result: string;
@@ -269,7 +269,7 @@ class ExportShareService {
     ];
   }
 
-  private processPlayerStats(_playerData: unknown): {
+  private processPlayerStats(_playerData: unknown): { // eslint-disable-line @typescript-eslint/no-unused-vars
     overall: {
       rank: string;
       lp: number;

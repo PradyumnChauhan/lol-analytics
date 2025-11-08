@@ -457,12 +457,12 @@ class AdvancedAnalyticsEngine {
     }, 0);
   }
 
-  private identifyPrimaryRole(_matches: MatchData[]): string {
+  private identifyPrimaryRole(_matches: MatchData[]): string { // eslint-disable-line @typescript-eslint/no-unused-vars
     // Mock implementation - would analyze actual lane assignments
     return 'ADC';
   }
 
-  private identifySecondaryRole(_matches: MatchData[]): string {
+  private identifySecondaryRole(_matches: MatchData[]): string { // eslint-disable-line @typescript-eslint/no-unused-vars
     return 'Support';
   }
 
@@ -521,7 +521,7 @@ class AdvancedAnalyticsEngine {
     }
   }
 
-  private getMockChampionRecommendations(_role: string, _playStyle: string) {
+  private getMockChampionRecommendations(_role: string, _playStyle: string) { // eslint-disable-line @typescript-eslint/no-unused-vars
     const recommendations = [
       { championId: 22, championName: 'Ashe', matchScore: 88, reasons: ['High utility', 'Good for team play'], difficulty: 3 },
       { championId: 202, championName: 'Jinx', matchScore: 85, reasons: ['Strong scaling', 'High damage potential'], difficulty: 6 },

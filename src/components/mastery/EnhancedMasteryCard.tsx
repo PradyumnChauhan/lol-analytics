@@ -34,15 +34,16 @@ const MASTERY_LEVEL_NAMES = {
   7: 'S++' 
 };
 
-const _POINTS_FOR_NEXT_LEVEL = {
-  1: 1800,
-  2: 4200, 
-  3: 8400,
-  4: 14400,
-  5: 21600,
-  6: 21600,
-  7: 0 // Max level
-};
+// Unused constant - kept for potential future use
+// const _POINTS_FOR_NEXT_LEVEL = {
+//   1: 1800,
+//   2: 4200, 
+//   3: 8400,
+//   4: 14400,
+//   5: 21600,
+//   6: 21600,
+//   7: 0 // Max level
+// };
 
 export function EnhancedMasteryCard({ mastery, championName, rank }: EnhancedMasteryCardProps) {
   const formatPoints = (points: number) => {

@@ -58,7 +58,7 @@ export function ItemBuildTimeline({ match, playerPuuid, className = '' }: ItemBu
 
   // Estimate item purchase times based on gold progression
   const totalGold = participant.goldEarned || 0;
-  const itemsPurchased = participant.itemsPurchased || 0;
+  // const itemsPurchased = participant.itemsPurchased || 0;
 
   // Create estimated timeline
   const itemEvents: ItemEvent[] = [];

@@ -6,7 +6,7 @@ interface HeatmapProps {
   colors?: string[];
 }
 
-export function Heatmap({ data, labels }: HeatmapProps) {
+export function Heatmap({ data }: HeatmapProps) {
   if (!data || data.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-gray-400">
