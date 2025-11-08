@@ -1,4 +1,4 @@
-import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
+import { BedrockRuntimeClient, InvokeModelCommand, InvokeModelWithResponseStreamCommand } from '@aws-sdk/client-bedrock-runtime';
 
 // Initialize Bedrock client
 // DeepSeek V3.1 is available in: us-west-2, ap-northeast-1, ap-south-1, eu-west-2, eu-north-1
@@ -43,6 +43,7 @@ export const handler = async (event) => {
         }
         
         // Determine analysis type
+        const isStreamingRequest = body.stream === true || body.stream === 'true';
         if (endpoint === 'chat' || analysisType === 'chat') {
             analysisType = 'chat';
             const question = body.question || '';
@@ -88,7 +89,12 @@ export const handler = async (event) => {
             top_p: 0.9
         };
         
-        // Call Bedrock DeepSeek model
+        // For chat with streaming, use streaming API
+        if (analysisType === 'chat' && isStreamingRequest) {
+            return await handleStreamingChat(bedrockRequest, modelId, finalPlayerData, body.conversationHistory || []);
+        }
+        
+        // Call Bedrock DeepSeek model (non-streaming)
         console.log('📤 [BEDROCK] Invoking DeepSeek V3.1 with request:', JSON.stringify({
             modelId,
             maxTokens,
@@ -868,5 +874,80 @@ function formatClashSection(clash) {
     }
     
     return `TOURNAMENT PARTICIPATION:\n${parts.join('\n')}`;
+}
+
+/**
+ * Handle streaming chat responses
+ * Accumulates stream chunks and returns them in a format suitable for streaming
+ */
+async function handleStreamingChat(bedrockRequest, modelId, playerData, conversationHistory) {
+    try {
+        console.log('📤 [BEDROCK] Starting streaming chat with DeepSeek V3.1');
+        
+        const command = new InvokeModelWithResponseStreamCommand({
+            modelId: modelId,
+            contentType: 'application/json',
+            accept: 'application/json',
+            body: JSON.stringify(bedrockRequest)
+        });
+        
+        const response = await bedrockClient.send(command);
+        const stream = response.body;
+        
+        if (!stream) {
+            throw new Error('No stream received from Bedrock');
+        }
+        
+        // Accumulate chunks
+        const chunks = [];
+        let fullText = '';
+        
+        // Process the stream
+        for await (const event of stream) {
+            if (event.chunk) {
+                const chunk = JSON.parse(new TextDecoder().decode(event.chunk.bytes));
+                
+                // Extract text from various possible formats
+                let text = '';
+                if (chunk.choices?.[0]?.delta?.content) {
+                    text = chunk.choices[0].delta.content;
+                } else if (chunk.delta?.text) {
+                    text = chunk.delta.text;
+                } else if (chunk.output?.text) {
+                    text = chunk.output.text;
+                } else if (typeof chunk.text === 'string') {
+                    text = chunk.text;
+                }
+                
+                if (text) {
+                    chunks.push(text);
+                    fullText += text;
+                }
+            }
+        }
+        
+        console.log(`✅ [BEDROCK] Streaming complete. Received ${chunks.length} chunks, total length: ${fullText.length}`);
+        
+        // Return streaming response format
+        return {
+            statusCode: 200,
+            headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            body: JSON.stringify({
+                insights: fullText,
+                chunks: chunks,  // Include chunks for client-side streaming simulation
+                stream: true,
+                analysisType: 'chat',
+                matchesAnalyzed: playerData.recentMatches?.length || 0,
+                model: modelId
+            })
+        };
+        
+    } catch (error) {
+        console.error('❌ [BEDROCK] Streaming error:', error);
+        return errorResponse(500, `Streaming error: ${error.message}`);
+    }
 }
 

@@ -45,10 +45,10 @@ function HomeContent() {
       {/* Background Video */}
       <div className="absolute inset-0 w-full h-full">
         <video className="w-full h-full object-cover" autoPlay loop muted playsInline>
-          <source src="/bg/animated-ionia.webm" type="video/webm" />
+          <source src="/bg/champion-kayn-slayer-animated.webm" type="video/webm" />
           <source src="/bg/animated-freljord.webm" type="video/webm" />
         </video>
-        <div className="absolute inset-0 bg-black/12"></div>
+        <div className="absolute inset-0 "></div>
       </div>
 
       {/* Content */}
@@ -59,10 +59,10 @@ function HomeContent() {
             <div className="max-w-7xl mx-auto px-6 py-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <GamepadIcon className="h-7 w-7 text-slate-900" />
-                  <h1 className="text-lg font-semibold text-slate-900">LoL Analytics</h1>
+                  <GamepadIcon className="h-7 w-7 text-white" />
+                  <h1 className="text-lg font-semibold text-white">LoL Analytics</h1>
                 </div>
-                <div className="text-slate-800 text-sm font-medium">Player Performance Insights</div>
+                <div className="text-white text-sm font-medium">Player Performance Insights</div>
               </div>
             </div>
           </div>
@@ -72,8 +72,8 @@ function HomeContent() {
         <div className="flex items-center justify-center min-h-screen px-6">
           <div className="w-full max-w-2xl text-center">
             {/* Heading */}
-            <h2 className="text-5xl md:text-6xl font-bold text-slate-950 mb-4">Analyze Your Performance</h2>
-            <p className="text-lg text-slate-800 mb-12 leading-relaxed">
+            <h2 className="text-5xl md:text-6xl font-bold text-white mb-4">Analyze Your Performance</h2>
+            <p className="text-lg text-white mb-12 leading-relaxed">
               Track stats, champion mastery, and climb the ranked ladder with detailed insights
             </p>
 
@@ -107,9 +107,9 @@ function HomeContent() {
 
             {/* Divider */}
             <div className="flex items-center gap-3 mb-8">
-              <div className="flex-1 h-px bg-slate-600/40"></div>
-              <span className="text-slate-700 text-sm font-medium">OR</span>
-              <div className="flex-1 h-px bg-slate-600/40"></div>
+              <div className="flex-1 h-px bg-white"></div>
+              <span className="text-white text-sm font-medium">OR</span>
+              <div className="flex-1 h-px bg-white"></div>
             </div>
 
             {/* Search Form */}

@@ -1240,7 +1240,7 @@ app.post('/api/ai/dashboard-insights', async (req, res) => {
   }
 });
 
-// AI Chat endpoint - Conversational queries
+// AI Chat endpoint - Conversational queries with real-time streaming
 app.post('/api/ai/chat', async (req, res) => {
   try {
     const bedrockUrl = getBedrockLambdaUrl();
@@ -1295,54 +1295,127 @@ app.post('/api/ai/chat', async (req, res) => {
     
     console.log(`💬 [AI Chat] Question from ${playerData.playerInfo.gameName}: ${question.substring(0, 50)}...`);
     
-    const response = await axios.post(bedrockUrl, {
-      playerData,
-      analysisType: 'chat',
-      question: question.trim(),
-      conversationHistory: conversationHistoryArray
-    }, {
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      timeout: 30000
-    });
+    // Check if streaming is requested
+    const streamRequested = req.body.stream === true || req.body.stream === 'true';
     
-    const aiResponse = response.data;
-    const answer = aiResponse.insights;
-    
-    // Add AI response to history
-    history.messages.push({
-      role: 'assistant',
-      content: answer,
-      timestamp: Date.now()
-    });
-    
-    // Keep history to last 10 messages max
-    if (history.messages.length > 10) {
-      history.messages = history.messages.slice(-10);
-    }
-    
-    res.json({
-      success: true,
-      answer: answer,
-      conversationHistory: history.messages.map(msg => ({
-        role: msg.role,
-        content: msg.content
-      })),
-      _metadata: {
-        timestamp: new Date().toISOString(),
-        source: 'Amazon Bedrock (DeepSeek V3.1)',
-        model: aiResponse.model
+    if (streamRequested) {
+      // Real-time streaming using Server-Sent Events (SSE)
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+      
+      let fullAnswer = '';
+      
+      try {
+        // Call Lambda with streaming
+        const response = await axios.post(bedrockUrl, {
+          playerData,
+          analysisType: 'chat',
+          question: question.trim(),
+          conversationHistory: conversationHistoryArray,
+          stream: true
+        }, {
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          timeout: 60000,
+          responseType: 'json'
+        });
+        
+        const aiResponse = response.data;
+        
+        // If Lambda returns chunks array, stream them in real-time
+        if (aiResponse.chunks && Array.isArray(aiResponse.chunks)) {
+          for (let i = 0; i < aiResponse.chunks.length; i++) {
+            const chunk = aiResponse.chunks[i];
+            fullAnswer += chunk;
+            
+            // Send chunk immediately via SSE
+            res.write(`data: ${JSON.stringify({ type: 'chunk', content: chunk, index: i })}\n\n`);
+          }
+        } else {
+          // Fallback: send full response
+          fullAnswer = aiResponse.insights || '';
+          res.write(`data: ${JSON.stringify({ type: 'chunk', content: fullAnswer })}\n\n`);
+        }
+        
+        // Send completion event
+        res.write(`data: ${JSON.stringify({ type: 'done', fullText: fullAnswer })}\n\n`);
+        
+        // Add AI response to history
+        history.messages.push({
+          role: 'assistant',
+          content: fullAnswer,
+          timestamp: Date.now()
+        });
+        
+        // Keep history to last 10 messages max
+        if (history.messages.length > 10) {
+          history.messages = history.messages.slice(-10);
+        }
+        
+        res.end();
+      } catch (streamError) {
+        console.error('❌ [AI] Streaming error:', streamError.message);
+        res.write(`data: ${JSON.stringify({ type: 'error', error: streamError.message })}\n\n`);
+        res.end();
       }
-    });
+    } else {
+      // Non-streaming response (legacy)
+      const response = await axios.post(bedrockUrl, {
+        playerData,
+        analysisType: 'chat',
+        question: question.trim(),
+        conversationHistory: conversationHistoryArray,
+        stream: false
+      }, {
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        timeout: 60000
+      });
+      
+      const aiResponse = response.data;
+      const answer = aiResponse.insights || '';
+      
+      // Add AI response to history
+      history.messages.push({
+        role: 'assistant',
+        content: answer,
+        timestamp: Date.now()
+      });
+      
+      // Keep history to last 10 messages max
+      if (history.messages.length > 10) {
+        history.messages = history.messages.slice(-10);
+      }
+      
+      // Return response
+      res.json({
+        success: true,
+        answer: answer,
+        conversationHistory: history.messages.map(msg => ({
+          role: msg.role,
+          content: msg.content
+        })),
+        _metadata: {
+          timestamp: new Date().toISOString(),
+          source: 'Amazon Bedrock (DeepSeek V3.1)',
+          model: aiResponse.model
+        }
+      });
+    }
     
   } catch (error) {
     console.error('❌ [AI] Chat failed:', error.message);
-    res.status(error.response?.status || 500).json({
-      error: 'Failed to process chat question',
-      details: error.response?.data || error.message,
-      suggestion: 'Check Bedrock Lambda function URL and try again'
-    });
+    if (!res.headersSent) {
+      res.status(error.response?.status || 500).json({
+        error: 'Failed to process chat question',
+        details: error.response?.data || error.message,
+        suggestion: 'Check Bedrock Lambda function URL and try again'
+      });
+    }
   }
 });
 

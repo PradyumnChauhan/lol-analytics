@@ -27,6 +27,7 @@ interface UseAIAnalyticsReturn {
   dashboardInsights: DashboardInsights | null;
   chatHistory: ChatMessage[];
   loading: boolean;
+  isStreaming: boolean;
   error: string | null;
   fetchDashboardInsights: (playerData: AIDataPayload) => Promise<void>;
   askQuestion: (question: string, playerData: AIDataPayload, puuid?: string) => Promise<void>;
@@ -42,8 +43,10 @@ export function useAIAnalytics(): UseAIAnalyticsReturn {
   const [dashboardInsights, setDashboardInsights] = useState<DashboardInsights | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const lastFetchRef = useRef<string>('');
+  const streamingAbortRef = useRef<AbortController | null>(null);
 
   // Generate cache key from player data
   const generateCacheKey = (playerData: AIDataPayload): string => {
@@ -105,7 +108,7 @@ export function useAIAnalytics(): UseAIAnalyticsReturn {
       } else if (typeof data.insights === 'string') {
         // Legacy text format
         insights = {
-          insights: data.insights,
+        insights: data.insights,
           analysisType: data.analysisType || 'dashboard',
           matchesAnalyzed: data.matchesAnalyzed || 0,
           model: data.model,
@@ -117,11 +120,11 @@ export function useAIAnalytics(): UseAIAnalyticsReturn {
         insights = {
           insights: data as DashboardInsightsResponse,
           analysisType: data.analysisType || 'dashboard',
-          matchesAnalyzed: data.matchesAnalyzed || 0,
-          model: data.model,
+        matchesAnalyzed: data.matchesAnalyzed || 0,
+        model: data.model,
           prompt: data.prompt,
-          promptMetadata: data.promptMetadata,
-        };
+        promptMetadata: data.promptMetadata,
+      };
       }
 
       setDashboardInsights(insights);
@@ -146,11 +149,17 @@ export function useAIAnalytics(): UseAIAnalyticsReturn {
     }
 
     // Prevent spam - limit requests
-    if (loading) {
+    if (loading || isStreaming) {
       return;
     }
 
+    // Cancel any ongoing streaming
+    if (streamingAbortRef.current) {
+      streamingAbortRef.current.abort();
+    }
+
     setLoading(true);
+    setIsStreaming(true);
     setError(null);
 
     // Add user message to chat history immediately
@@ -160,6 +169,13 @@ export function useAIAnalytics(): UseAIAnalyticsReturn {
       timestamp: Date.now(),
     };
     setChatHistory((prev) => [...prev, userMessage]);
+
+    // Create placeholder assistant message for streaming
+    const assistantMessageId = Date.now();
+    let accumulatedText = '';
+
+    const abortController = new AbortController();
+    streamingAbortRef.current = abortController;
 
     try {
       // Use Next.js API route to proxy the request (avoids mixed-content issues)
@@ -173,6 +189,7 @@ export function useAIAnalytics(): UseAIAnalyticsReturn {
           question: question.trim(),
           puuid: puuid || playerData.playerInfo?.gameName + '#' + playerData.playerInfo?.tagLine,
         }),
+        signal: abortController.signal,
       });
 
       if (!response.ok) {
@@ -180,34 +197,134 @@ export function useAIAnalytics(): UseAIAnalyticsReturn {
         throw new Error(errorData.error || `Failed to process question: ${response.status}`);
       }
 
-      const data = await response.json();
+      // Check if response is streaming (SSE)
+      const contentType = response.headers.get('content-type');
+      if (contentType?.includes('text/event-stream')) {
+        // Real-time streaming via SSE
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
 
-      // Update chat history with response
-      const assistantMessage: ChatMessage = {
-        role: 'assistant',
-        content: data.answer,
-        timestamp: Date.now(),
-      };
+        if (!reader) {
+          throw new Error('No response body reader available');
+        }
 
-      setChatHistory(data.conversationHistory || [...chatHistory, userMessage, assistantMessage]);
+        // Add placeholder message
+        setChatHistory((prev) => [...prev, {
+          role: 'assistant',
+          content: '',
+          timestamp: assistantMessageId,
+        }]);
+
+        try {
+          let buffer = '';
+          
+          while (true) {
+            if (abortController.signal.aborted) {
+              reader.cancel();
+              break;
+            }
+
+            const { done, value } = await reader.read();
+
+            if (done) {
+              break;
+            }
+
+            // Decode chunk
+            buffer += decoder.decode(value, { stream: true });
+            
+            // Process complete SSE messages
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                try {
+                  const data = JSON.parse(line.slice(6));
+                  
+                  if (data.type === 'chunk') {
+                    accumulatedText += data.content;
+                    
+                    // Update message in real-time
+                    setChatHistory((prev) => {
+                      const newHistory = [...prev];
+                      const lastMsg = newHistory[newHistory.length - 1];
+                      if (lastMsg && lastMsg.role === 'assistant' && lastMsg.timestamp === assistantMessageId) {
+                        lastMsg.content = accumulatedText;
+                      }
+                      return newHistory;
+                    });
+                  } else if (data.type === 'done') {
+                    // Final update with complete text
+                    accumulatedText = data.fullText || accumulatedText;
+                    setChatHistory((prev) => {
+                      const newHistory = [...prev];
+                      const lastMsg = newHistory[newHistory.length - 1];
+                      if (lastMsg && lastMsg.role === 'assistant' && lastMsg.timestamp === assistantMessageId) {
+                        lastMsg.content = accumulatedText;
+                      }
+                      return newHistory;
+                    });
+                    break;
+                  } else if (data.type === 'error') {
+                    throw new Error(data.error || 'Streaming error');
+                  }
+                } catch (parseError) {
+                  console.warn('Failed to parse SSE data:', parseError);
+                }
+              }
+            }
+          }
+        } finally {
+          reader.releaseLock();
+        }
+      } else {
+        // Non-streaming response
+        const data = await response.json();
+        const finalMessage: ChatMessage = {
+          role: 'assistant',
+          content: data.answer || data.insights || '',
+          timestamp: Date.now(),
+        };
+
+        setChatHistory((prev) => [...prev, finalMessage]);
+      }
     } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        // Request was aborted, don't show error
+        return;
+      }
+      
       console.error('Failed to process question:', err);
       setError((err instanceof Error ? err.message : 'Failed to get AI response'));
       
-      // Remove user message on error
-      setChatHistory((prev) => prev.slice(0, -1));
+      // Remove user message and placeholder on error
+      setChatHistory((prev) => {
+        const filtered = prev.filter(msg => 
+          !(msg.role === 'assistant' && msg.timestamp === assistantMessageId && msg.content === '')
+        );
+        // If we have accumulated text, keep it, otherwise remove the last assistant message
+        if (accumulatedText) {
+          return filtered;
+        }
+        return filtered.slice(0, -1);
+      });
       
-      // Add error message
-      const errorMessage: ChatMessage = {
-        role: 'assistant',
-        content: 'Sorry, I encountered an error processing your question. Please try again.',
-        timestamp: Date.now(),
-      };
-      setChatHistory((prev) => [...prev, errorMessage]);
+      // Add error message only if no text was accumulated
+      if (!accumulatedText) {
+        const errorMessage: ChatMessage = {
+          role: 'assistant',
+          content: 'Sorry, I encountered an error processing your question. Please try again.',
+          timestamp: Date.now(),
+        };
+        setChatHistory((prev) => [...prev, errorMessage]);
+      }
     } finally {
       setLoading(false);
+      setIsStreaming(false);
+      streamingAbortRef.current = null;
     }
-  }, [loading, chatHistory]);
+  }, [loading, isStreaming]);
 
   const generateSummary = useCallback(async (playerData: AIDataPayload) => {
     if (loading) {
@@ -264,6 +381,7 @@ export function useAIAnalytics(): UseAIAnalyticsReturn {
     dashboardInsights,
     chatHistory,
     loading,
+    isStreaming,
     error,
     fetchDashboardInsights,
     askQuestion,

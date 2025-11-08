@@ -96,6 +96,10 @@ function PlayerDashboard() {
   })
   const [matchesToShow, setMatchesToShow] = useState(10)
   const [championsToShow, setChampionsToShow] = useState(10)
+  const [masteryToShow, setMasteryToShow] = useState(30)
+  const [isLoadingMoreMatches, setIsLoadingMoreMatches] = useState(false)
+  const [hasMoreMatches, setHasMoreMatches] = useState(false)
+  const [totalMatchesFetched, setTotalMatchesFetched] = useState(0)
   const [playerData, setPlayerData] = useState<PlayerDataState>({
     isLoading: true,
     error: null,
@@ -119,6 +123,31 @@ function PlayerDashboard() {
   const [aggregatedAIData, setAggregatedAIData] = useState<AIDataPayload | null>(null)
 
   const isClient = typeof window !== "undefined"
+
+  // Helper function to group matches by date
+  const groupMatchesByDate = useCallback((matches: MatchDto[]) => {
+    const grouped: Record<string, MatchDto[]> = {}
+    
+    matches.forEach((match) => {
+      if (!match?.info?.gameCreation) return
+      const date = new Date(match.info.gameCreation)
+      const dateKey = date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      })
+      
+      if (!grouped[dateKey]) {
+        grouped[dateKey] = []
+      }
+      grouped[dateKey].push(match)
+    })
+    
+    // Sort dates in descending order (most recent first)
+    return Object.entries(grouped).sort(([dateA], [dateB]) => {
+      return new Date(dateB).getTime() - new Date(dateA).getTime()
+    })
+  }, [])
 
   // Helper function to safely parse JSON responses
   const safeJsonParse = async (res: Response) => {
@@ -191,9 +220,9 @@ function PlayerDashboard() {
       const analytics = aggregateChampionStats(data.matches || [], data.championMastery || [], puuid)
       const trends = calculateTrends(data.matches || [], puuid)
 
-      // Fetch total mastery score if available
+      // Fetch total mastery score if available (use Next.js API route to avoid CORS)
       if (puuid && data.region) {
-        fetch(`${getBackendUrl()}/api/champion-mastery/v4/scores/by-puuid/${puuid}?region=${data.region}`)
+        fetch(`/api/champion-mastery/scores/by-puuid/${puuid}?region=${data.region}`)
           .then(res => res.ok ? res.json() : null)
           .then(scoreData => {
             if (scoreData?.score !== undefined) {
@@ -211,12 +240,13 @@ function PlayerDashboard() {
         setTotalMasteryScore(calculatedScore)
       }
 
+      const initialMatches = data.matches || []
       setPlayerData({
         isLoading: false,
         error: null,
         account: data.account,
         summoner: normalizedSummoner,
-        matchDetails: data.matches || [],
+        matchDetails: initialMatches,
         championMastery: transformedMasteryData,
         leagueEntries: data.leagueEntries,
         challenges: data.challenges,
@@ -227,6 +257,9 @@ function PlayerDashboard() {
           championStats: analytics,
         },
       })
+      setTotalMatchesFetched(initialMatches.length)
+      // Assume there might be more matches if we got 20 matches
+      setHasMoreMatches(initialMatches.length >= 20)
     } catch (error: unknown) {
       console.error("Error fetching player data:", error)
       const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
@@ -430,7 +463,59 @@ function PlayerDashboard() {
     fetchPlayerData()
     fetchChallenges()
     fetchLiveGame()
+    setTotalMatchesFetched(0)
+    setHasMoreMatches(false)
   }
+
+  const fetchMoreMatches = useCallback(async () => {
+    if (!playerData.account || !playerData.region || isLoadingMoreMatches) return
+    
+    setIsLoadingMoreMatches(true)
+    try {
+      const res = await fetch(
+        `/api/player/${encodeURIComponent(gameName as string)}/${encodeURIComponent(tagLine as string)}/matches?region=${playerData.region}&start=${totalMatchesFetched}&count=10`,
+      )
+      if (!res.ok) {
+        throw new Error(`Failed to fetch more matches (${res.status})`)
+      }
+      const data = await safeJsonParse(res)
+      
+      if (data.matches && data.matches.length > 0) {
+        const newMatches = data.matches
+        setPlayerData((prev) => {
+          const allMatches = [...prev.matchDetails, ...newMatches]
+          const puuid = prev.account?.puuid || ""
+          
+          // Recalculate analytics with new matches
+          const analytics = aggregateChampionStats(allMatches, prev.championMastery as unknown as Array<Record<string, unknown>>, puuid)
+          const trends = calculateTrends(allMatches, puuid)
+          
+          return {
+            ...prev,
+            matchDetails: allMatches,
+            analyticsData: {
+              trends: trends,
+              championStats: analytics,
+            },
+          }
+        })
+        setTotalMatchesFetched(data.totalFetched || totalMatchesFetched + newMatches.length)
+        
+        // Keep hasMoreMatches true if API says there are more, or if we got the full requested count
+        // Only set to false if API explicitly says no more AND we got fewer than requested
+        const requestedCount = 10
+        const hasMore = data.hasMore === true || (data.hasMore !== false && newMatches.length >= requestedCount)
+        setHasMoreMatches(hasMore)
+      } else {
+        // No matches returned means we've reached the end
+        setHasMoreMatches(false)
+      }
+    } catch (error: unknown) {
+      console.error("Error fetching more matches:", error)
+    } finally {
+      setIsLoadingMoreMatches(false)
+    }
+  }, [gameName, tagLine, playerData, totalMatchesFetched, isLoadingMoreMatches])
 
   const handleMatchClick = (match: MatchDto) => {
     setSelectedMatch(match)
@@ -581,8 +666,8 @@ function PlayerDashboard() {
     <div className="min-h-screen relative overflow-hidden bg-slate-950">
       {/* Enhanced Animated Background Video */}
       <div className="fixed inset-0 z-0">
-        <video autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover opacity-50">
-          <source src="/bg/animated-ionia.webm" type="video/webm" />
+        <video autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover opacity-100">
+          <source src="/bg/animated-freljord.webm" type="video/webm" />
         </video>
         {/* Minimal gradient overlay for readability - no purple */}
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-slate-950/40"></div>
@@ -1198,44 +1283,73 @@ function PlayerDashboard() {
 
                     const totalFiltered = filteredMatches.length
                     const matchesToDisplay = filteredMatches.slice(0, matchesToShow)
-                    const hasMore = totalFiltered > matchesToShow
-                    const remaining = totalFiltered - matchesToShow
+                    
+                    // Group matches by date
+                    const groupedMatches = groupMatchesByDate(matchesToDisplay)
 
                     return (
                       <>
-                        <div className="space-y-0.5">
-                          {matchesToDisplay.map((match, index) => {
-                            const participant = match.info.participants.find(
-                              (p: MatchParticipant) => p && p.puuid === account.puuid,
-                            )
-                            if (!participant) return null
+                        <div className="space-y-3">
+                          {groupedMatches.map(([dateKey, dateMatches]) => (
+                            <div key={dateKey} className="space-y-1">
+                              <div className="sticky top-0 z-10 bg-slate-900/95 backdrop-blur-sm border-b border-yellow-500/20 pb-1 mb-2">
+                                <h4 className="text-white/90 font-semibold text-sm">{dateKey}</h4>
+                              </div>
+                              <div className="space-y-0.5">
+                                {dateMatches.map((match, index) => {
+                                  const participant = match.info.participants.find(
+                                    (p: MatchParticipant) => p && p.puuid === account.puuid,
+                                  )
+                                  if (!participant) return null
 
-                            return (
-                              <CompactMatchCard
-                                key={`${match.metadata?.matchId || index}-${index}`}
-                                match={match}
-                                participant={participant}
-                                onMatchClick={() => handleMatchClick(match)}
-                              />
-                            )
-                          })}
+                                  return (
+                                    <CompactMatchCard
+                                      key={`${match.metadata?.matchId || index}-${index}`}
+                                      match={match}
+                                      participant={participant}
+                                      onMatchClick={() => handleMatchClick(match)}
+                                    />
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                        {hasMore && remaining > 0 && (
+                        {(hasMoreMatches || totalFiltered > matchesToShow) && (
                           <div className="mt-4 pt-4 border-t border-yellow-500/30">
                             <Button
-                              onClick={(e) => {
+                              onClick={async (e) => {
                                 e.preventDefault()
                                 e.stopPropagation()
-                                setMatchesToShow(prev => {
-                                  const newValue = Math.min(prev + 10, totalFiltered)
-                                  return newValue
-                                })
+                                
+                                // If we have more filtered matches to show, show them first
+                                if (totalFiltered > matchesToShow) {
+                                  setMatchesToShow(prev => {
+                                    const newValue = Math.min(prev + 10, totalFiltered)
+                                    return newValue
+                                  })
+                                } else if (hasMoreMatches) {
+                                  // Fetch more matches from API
+                                  await fetchMoreMatches()
+                                  // After fetching, show more of the filtered matches
+                                  setMatchesToShow(prev => prev + 10)
+                                }
                               }}
                               variant="ghost"
                               size="sm"
-                              className="w-full text-white bg-gradient-to-r from-yellow-500/20 to-amber-500/20 hover:from-yellow-500/30 hover:to-amber-500/30 border border-yellow-500/40 rounded-lg text-xs h-10 font-semibold shadow-lg hover:shadow-yellow-500/20 transition-all"
+                              disabled={isLoadingMoreMatches}
+                              className="w-full text-white bg-gradient-to-r from-yellow-500/20 to-amber-500/20 hover:from-yellow-500/30 hover:to-amber-500/30 border border-yellow-500/40 rounded-lg text-xs h-10 font-semibold shadow-lg hover:shadow-yellow-500/20 transition-all disabled:opacity-50"
                             >
-                              Load More ({remaining} remaining)
+                              {isLoadingMoreMatches ? (
+                                <>
+                                  <RefreshCw className="h-3 w-3 mr-2 animate-spin" />
+                                  Loading...
+                                </>
+                              ) : hasMoreMatches ? (
+                                `Load More Matches (${totalMatchesFetched} fetched)`
+                              ) : (
+                                `Load More (${totalFiltered - matchesToShow} remaining)`
+                              )}
                             </Button>
                           </div>
                         )}
@@ -1500,12 +1614,14 @@ function PlayerDashboard() {
                             {hasMore && remaining > 0 && (
                               <div className="mt-2 pt-2 border-t border-yellow-500/30">
                                 <Button
-                                  onClick={() => setChampionsToShow(prev => Math.min(prev + 10, totalChampions))}
+                                  onClick={() => {
+                                    setChampionsToShow(prev => Math.min(prev + 10, totalChampions))
+                                  }}
                                   variant="ghost"
                                   size="sm"
                                   className="w-full text-white bg-gradient-to-r from-yellow-500/20 to-amber-500/20 hover:from-yellow-500/30 hover:to-amber-500/30 border border-yellow-500/40 rounded-lg text-xs h-9 font-semibold shadow-lg hover:shadow-yellow-500/20 transition-all"
                                 >
-                                  Load More ({remaining} remaining)
+                                  Load More Champions ({remaining} remaining)
                                 </Button>
                               </div>
                             )}
@@ -1542,8 +1658,9 @@ function PlayerDashboard() {
                   )}
                 </div>
                 {championMastery.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1">
-                    {championMastery.slice(0, 30).map((mastery, index) => {
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1">
+                      {championMastery.slice(0, masteryToShow).map((mastery, index) => {
                       const champName = mastery.championName || getChampionName(mastery.championId)
                       const pointsToNext = mastery.championPointsUntilNextLevel || 0
                       const pointsSinceLast = mastery.championPointsSinceLastLevel || 0
@@ -1668,7 +1785,22 @@ function PlayerDashboard() {
                         </div>
                       )
                     })}
-                  </div>
+                    </div>
+                    {championMastery.length > masteryToShow && (
+                      <div className="mt-4 pt-4 border-t border-yellow-500/30">
+                        <Button
+                          onClick={() => {
+                            setMasteryToShow(prev => Math.min(prev + 30, championMastery.length))
+                          }}
+                          variant="ghost"
+                          size="sm"
+                          className="w-full text-white bg-gradient-to-r from-yellow-500/20 to-amber-500/20 hover:from-yellow-500/30 hover:to-amber-500/30 border border-yellow-500/40 rounded-lg text-xs h-9 font-semibold shadow-lg hover:shadow-yellow-500/20 transition-all"
+                        >
+                          Load More Mastery ({championMastery.length - masteryToShow} remaining)
+                        </Button>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className="text-center py-2">
                     <Trophy className="h-8 w-8 mx-auto text-white/40 mb-1" />

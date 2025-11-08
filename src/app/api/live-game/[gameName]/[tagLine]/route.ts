@@ -108,12 +108,14 @@ export async function GET(
       'AccountByRiotId'
     );
     if (!accountResponse.ok) {
+      const errorData = await accountResponse.json().catch(() => ({ message: accountResponse.statusText }));
       console.error('[API Route] Account fetch failed:', {
         status: accountResponse.status,
-        statusText: accountResponse.statusText
+        statusText: accountResponse.statusText,
+        errorData
       });
       return NextResponse.json(
-        { message: `Account not found: ${accountResponse.statusText}` },
+        { message: errorData.message || `Account not found: ${accountResponse.statusText}` },
         { status: accountResponse.status }
       );
     }
@@ -128,12 +130,14 @@ export async function GET(
       'SummonerByPuuid'
     );
     if (!summonerResponse.ok) {
+      const errorData = await summonerResponse.json().catch(() => ({ message: summonerResponse.statusText }));
       console.error('[API Route] Summoner fetch failed:', {
         status: summonerResponse.status,
-        statusText: summonerResponse.statusText
+        statusText: summonerResponse.statusText,
+        errorData
       });
       return NextResponse.json(
-        { message: `Summoner not found: ${summonerResponse.statusText}` },
+        { message: errorData.message || `Summoner not found: ${summonerResponse.statusText}` },
         { status: summonerResponse.status }
       );
     }
@@ -149,6 +153,8 @@ export async function GET(
     );
     
     if (!liveGameResponse.ok) {
+      const errorData = await liveGameResponse.json().catch(() => ({ message: liveGameResponse.statusText }));
+      
       if (liveGameResponse.status === 404) {
         console.log('[API Route] Step 3: Player not in game (404)');
         return NextResponse.json(
@@ -156,12 +162,18 @@ export async function GET(
           { status: 404 }
         );
       }
+      
       console.error('[API Route] Step 3: Live game fetch failed:', {
         status: liveGameResponse.status,
-        statusText: liveGameResponse.statusText
+        statusText: liveGameResponse.statusText,
+        errorData
       });
+      
       return NextResponse.json(
-        { message: `Failed to fetch live game: ${liveGameResponse.statusText}` },
+        { 
+          message: errorData.message || `Failed to fetch live game: ${liveGameResponse.statusText}`,
+          details: process.env.NODE_ENV === 'development' ? errorData : undefined
+        },
         { status: liveGameResponse.status }
       );
     }

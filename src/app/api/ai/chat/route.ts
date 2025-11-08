@@ -25,13 +25,19 @@ export async function POST(request: NextRequest) {
     };
 
     const startTime = Date.now();
+    // Add stream flag for chat requests
+    const requestBody = {
+      ...body,
+      stream: true, // Enable streaming for chat
+    };
+    
     const response = await fetch(`${backendUrl}/api/ai/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Connection': 'keep-alive',
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(requestBody),
       signal: createTimeoutSignal(60000), // 60 second timeout for AI requests
     });
 
@@ -41,6 +47,7 @@ export async function POST(request: NextRequest) {
       statusText: response.statusText,
       ok: response.ok,
       duration: `${duration}ms`,
+      contentType: response.headers.get('content-type'),
       timestamp: new Date().toISOString()
     });
 
@@ -56,8 +63,52 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const data = await response.json();
-    return NextResponse.json(data);
+    // Check if response is streaming (SSE)
+    const contentType = response.headers.get('content-type');
+    if (contentType?.includes('text/event-stream')) {
+      // Return streaming response
+      const stream = new ReadableStream({
+        async start(controller) {
+          const reader = response.body?.getReader();
+          const decoder = new TextDecoder();
+          
+          if (!reader) {
+            controller.close();
+            return;
+          }
+          
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              
+              if (done) {
+                controller.close();
+                break;
+              }
+              
+              const chunk = decoder.decode(value, { stream: true });
+              controller.enqueue(new TextEncoder().encode(chunk));
+            }
+          } catch (error) {
+            console.error('[API Route] Stream error:', error);
+            controller.error(error);
+          }
+        }
+      });
+      
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+          'X-Accel-Buffering': 'no',
+        },
+      });
+    } else {
+      // Non-streaming response
+      const data = await response.json();
+      return NextResponse.json(data);
+    }
   } catch (error: unknown) {
     const errorDetails = error instanceof Error ? {
       message: error.message,

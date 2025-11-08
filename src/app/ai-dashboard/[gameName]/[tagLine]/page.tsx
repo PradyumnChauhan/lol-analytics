@@ -9,9 +9,9 @@ import { useAIAnalytics } from '@/hooks/useAIAnalytics';
 import { aggregatePlayerDataForAI, type AIDataPayload } from '@/lib/ai/data-aggregator';
 import { FloatingAssistant } from '@/components/ai/FloatingAssistant';
 import { localStorageManager } from '@/lib/storage';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { getBackendUrl } from '@/lib/utils/backend-url';
+import { AIDashboardInsights } from '@/components/ai/AIDashboardInsights';
+import type { InsightCard, DashboardInsightsResponse } from '@/lib/ai/types';
 
 interface MatchParticipant {
   puuid: string;
@@ -374,9 +374,9 @@ export default function AIDashboardPage() {
     <div className="min-h-screen bg-white">
       {/* Enhanced Header */}
       <div className="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 shadow-xl sticky top-0 z-50 border-b-4 border-purple-400">
-        <div className="container mx-auto px-6 py-6">
+        <div className="container mx-auto px-4 py-3">
           {/* Top Row: Navigation & Actions */}
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-3">
               <Button 
                 variant="ghost" 
@@ -426,18 +426,18 @@ export default function AIDashboardPage() {
           </div>
 
           {/* Bottom Row: Player Info & Quick Stats */}
-          <div className="flex flex-wrap items-center justify-between gap-6">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             {/* Player Identity */}
-            <div className="flex items-center gap-5">
-              <div className="bg-white/20 backdrop-blur-sm rounded-xl p-3 border border-white/30 shadow-lg">
-                <Brain className="h-8 w-8 text-white" />
+            <div className="flex items-center gap-3">
+              <div className="bg-white/20 backdrop-blur-sm rounded-xl p-2 border border-white/30 shadow-lg">
+                <Brain className="h-6 w-6 text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-white flex items-center gap-3 mb-2">
+                <h1 className="text-2xl font-bold text-white flex items-center gap-2 mb-1">
                   {gameName}#{tagLine}
-                  <span className="text-base font-normal text-purple-100 bg-white/10 backdrop-blur-sm px-3 py-1 rounded-full border border-white/20">AI Analytics</span>
+                  <span className="text-sm font-normal text-purple-100 bg-white/10 backdrop-blur-sm px-2 py-0.5 rounded-full border border-white/20">AI Analytics</span>
                 </h1>
-                <div className="flex items-center gap-4 mt-2">
+                <div className="flex items-center gap-3 mt-1">
                   {rankedInfo && (
                     <span className="text-sm bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-full text-white border border-white/30 font-medium">
                       {rankedInfo.tier} {rankedInfo.rank} {rankedInfo.leaguePoints}LP
@@ -452,46 +452,46 @@ export default function AIDashboardPage() {
 
             {/* Quick Stats */}
             {matchStats && (
-              <div className="flex items-center gap-5 flex-wrap">
-                <div className="bg-white/15 backdrop-blur-sm rounded-xl px-5 py-3 border border-white/25 shadow-lg">
-                  <div className="flex items-center gap-3">
-                    <Trophy className="h-5 w-5 text-yellow-300" />
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="bg-white/15 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/25 shadow-lg">
+                  <div className="flex items-center gap-2">
+                    <Trophy className="h-4 w-4 text-yellow-300" />
                     <div>
-                      <div className="text-xs text-purple-100 font-medium mb-1">Win Rate</div>
-                      <div className="text-xl font-bold text-white">{matchStats.winRate.toFixed(1)}%</div>
+                      <div className="text-xs text-purple-100 font-medium mb-0.5">Win Rate</div>
+                      <div className="text-lg font-bold text-white">{matchStats.winRate.toFixed(1)}%</div>
                     </div>
                   </div>
                 </div>
                 
-                <div className="bg-white/15 backdrop-blur-sm rounded-xl px-5 py-3 border border-white/25 shadow-lg">
-                  <div className="flex items-center gap-3">
-                    <Target className="h-5 w-5 text-green-300" />
+                <div className="bg-white/15 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/25 shadow-lg">
+                  <div className="flex items-center gap-2">
+                    <Target className="h-4 w-4 text-green-300" />
                     <div>
-                      <div className="text-xs text-purple-100 font-medium mb-1">KDA</div>
-                      <div className="text-xl font-bold text-white">
+                      <div className="text-xs text-purple-100 font-medium mb-0.5">KDA</div>
+                      <div className="text-lg font-bold text-white">
                         {matchStats.avgKDA.kills.toFixed(1)}/{matchStats.avgKDA.deaths.toFixed(1)}/{matchStats.avgKDA.assists.toFixed(1)}
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-white/15 backdrop-blur-sm rounded-xl px-5 py-3 border border-white/25 shadow-lg">
-                  <div className="flex items-center gap-3">
-                    <TrendingUp className="h-5 w-5 text-blue-300" />
+                <div className="bg-white/15 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/25 shadow-lg">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-blue-300" />
                     <div>
-                      <div className="text-xs text-purple-100 font-medium mb-1">Recent Form</div>
-                      <div className="text-xl font-bold text-white">{matchStats.recentWinRate.toFixed(1)}%</div>
+                      <div className="text-xs text-purple-100 font-medium mb-0.5">Recent Form</div>
+                      <div className="text-lg font-bold text-white">{matchStats.recentWinRate.toFixed(1)}%</div>
                     </div>
                   </div>
                 </div>
 
                 {dashboardInsights && (
-                  <div className="bg-white/15 backdrop-blur-sm rounded-xl px-5 py-3 border border-white/25 shadow-lg">
-                    <div className="flex items-center gap-3">
-                      <Sparkles className="h-5 w-5 text-pink-300" />
+                  <div className="bg-white/15 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/25 shadow-lg">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-pink-300" />
                       <div>
-                        <div className="text-xs text-purple-100 font-medium mb-1">Matches Analyzed</div>
-                        <div className="text-xl font-bold text-white">{dashboardInsights.matchesAnalyzed}</div>
+                        <div className="text-xs text-purple-100 font-medium mb-0.5">Matches Analyzed</div>
+                        <div className="text-lg font-bold text-white">{dashboardInsights.matchesAnalyzed}</div>
                       </div>
                     </div>
                   </div>
@@ -503,7 +503,7 @@ export default function AIDashboardPage() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-4xl mx-auto px-8 py-16">
+      <div className="max-w-7xl mx-auto px-4 py-12">
         {aiError && (
           <Card className="p-6 mb-8 bg-red-50 border border-red-200">
             <p className="text-red-800 text-base">Error: {aiError}</p>
@@ -561,7 +561,7 @@ export default function AIDashboardPage() {
 
 interface AIDashboardContentProps {
   insights: {
-    insights: string;
+    insights: string | InsightCard[] | DashboardInsightsResponse;
     analysisType: string;
     matchesAnalyzed: number;
     model?: string;
@@ -573,55 +573,31 @@ function AIDashboardContent({ insights }: AIDashboardContentProps) {
   return (
     <article className="bg-white">
       {/* Blog-style Header */}
-      <header className="mb-12 pb-8 border-b border-gray-200">
-        <div className="flex items-center justify-between mb-4">
+      <header className="mb-8 pb-6 border-b border-gray-200">
+        <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
             <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg p-2">
               <Sparkles className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h1 className="text-4xl font-bold text-gray-900 mb-2">
+              <h1 className="text-3xl font-bold text-gray-900 mb-1">
                 AI Analysis
               </h1>
-              <p className="text-base text-gray-600">
+              <p className="text-sm text-gray-600">
                 Comprehensive insights based on {insights.matchesAnalyzed} matches analyzed
               </p>
             </div>
           </div>
           {insights.model && (
-            <span className="text-xs bg-gray-100 text-gray-700 px-3 py-1.5 rounded-full font-medium border border-gray-200">
+            <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-full font-medium border border-gray-200">
               {insights.model}
             </span>
           )}
         </div>
       </header>
 
-      {/* Blog Content */}
-      <div className="prose prose-lg max-w-none 
-        prose-headings:font-bold prose-headings:text-gray-900 
-        prose-h1:text-4xl prose-h1:font-bold prose-h1:text-gray-900 prose-h1:mt-0 prose-h1:mb-8 prose-h1:pb-4 prose-h1:border-b prose-h1:border-gray-200
-        prose-h2:text-3xl prose-h2:font-bold prose-h2:text-gray-900 prose-h2:mt-16 prose-h2:mb-6 prose-h2:pb-3 prose-h2:border-b prose-h2:border-gray-100
-        prose-h3:text-2xl prose-h3:font-semibold prose-h3:text-gray-900 prose-h3:mt-12 prose-h3:mb-5
-        prose-p:text-lg prose-p:text-gray-700 prose-p:leading-8 prose-p:mb-6 prose-p:font-normal
-        prose-strong:text-gray-900 prose-strong:font-semibold
-        prose-ul:text-gray-700 prose-ul:my-8 prose-ul:pl-6 prose-ul:space-y-3
-        prose-li:text-lg prose-li:text-gray-700 prose-li:mb-4 prose-li:leading-8 prose-li:font-normal prose-li:pl-1
-        prose-ol:text-gray-700 prose-ol:my-8 prose-ol:pl-6 prose-ol:space-y-3
-        prose-ol-li:text-lg prose-ol-li:text-gray-700 prose-ol-li:mb-4 prose-ol-li:leading-8 prose-ol-li:font-normal
-        prose-li::marker:text-gray-500 prose-li::marker:font-semibold
-        prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline
-        prose-blockquote:border-l-4 prose-blockquote:border-gray-300 prose-blockquote:pl-6 prose-blockquote:italic prose-blockquote:text-gray-700 prose-blockquote:bg-gray-50 prose-blockquote:py-3 prose-blockquote:rounded-r prose-blockquote:my-8
-        prose-code:text-gray-900 prose-code:bg-gray-100 prose-code:px-2 prose-code:py-1 prose-code:rounded prose-code:text-sm prose-code:font-mono
-        prose-pre:bg-gray-900 prose-pre:text-white prose-pre:rounded-lg prose-pre:p-4 prose-pre:my-8
-        [&>h1]:mt-0 [&>h1]:mb-8
-        [&>h2:first-of-type]:mt-0
-        [&>p:first-of-type]:mt-0
-        [&>ul:first-of-type]:mt-0
-        [&>ol:first-of-type]:mt-0">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-          {insights.insights}
-        </ReactMarkdown>
-      </div>
+      {/* Structured Insight Cards */}
+      <AIDashboardInsights insights={insights.insights} />
     </article>
   );
 }
