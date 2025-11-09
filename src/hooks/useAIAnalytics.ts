@@ -96,11 +96,16 @@ export function useAIAnalytics(): UseAIAnalyticsReturn {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
         const errorMessage = errorData.error || `Failed to fetch dashboard insights: ${response.status}`;
         
-        // Provide helpful error messages
+        // Provide helpful error messages based on status and error type
         if (response.status === 504) {
           throw new Error(`${errorMessage}. Gateway timeout - request may take up to 15 minutes.`);
         } else if (response.status === 500) {
-          throw new Error(`${errorMessage}. Server error - the AI processing may have failed. Please try again.`);
+          // Check if it's a network/connection error
+          if (errorData.errorType === 'Network error' || errorData.errorType === 'Connection refused' || errorMessage.includes('Failed to connect')) {
+            throw new Error(`${errorMessage}. The backend server may be down or unreachable. Please check if the backend is running and accessible.`);
+          } else {
+            throw new Error(`${errorMessage}. Server error - the AI processing may have failed. Please try again.`);
+          }
         } else {
           throw new Error(errorMessage);
         }
