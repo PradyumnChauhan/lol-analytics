@@ -76,18 +76,34 @@ export function useAIAnalytics(): UseAIAnalyticsReturn {
     setError(null);
 
     try {
-      // Use Next.js API route to proxy the request (avoids mixed-content issues)
+      // Use Next.js API route with 15-minute timeout support
+      // The route is configured with maxDuration = 900 seconds (15 minutes)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 16 * 60 * 1000); // 16 minutes to be safe
+      
       const response = await fetch('/api/ai/dashboard-insights', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ playerData }),
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || `Failed to fetch dashboard insights: ${response.status}`);
+        const errorMessage = errorData.error || `Failed to fetch dashboard insights: ${response.status}`;
+        
+        // Provide helpful error messages
+        if (response.status === 504) {
+          throw new Error(`${errorMessage}. Gateway timeout - request may take up to 15 minutes.`);
+        } else if (response.status === 500) {
+          throw new Error(`${errorMessage}. Server error - the AI processing may have failed. Please try again.`);
+        } else {
+          throw new Error(errorMessage);
+        }
       }
 
       const data = await response.json();

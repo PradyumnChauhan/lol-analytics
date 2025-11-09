@@ -4,7 +4,14 @@ import { getBackendUrl } from '@/lib/utils/backend-url';
 /**
  * Proxy endpoint for AI dashboard insights
  * Proxies requests to backend to avoid mixed-content issues (HTTPS -> HTTP)
+ * 
+ * This endpoint can take up to 15 minutes to process, so we configure
+ * the route to allow extended execution time.
  */
+export const maxDuration = 900; // 15 minutes in seconds
+export const runtime = 'nodejs'; // Use Node.js runtime for longer timeouts
+export const dynamic = 'force-dynamic'; // Ensure dynamic rendering
+
 export async function POST(request: NextRequest) {
   try {
     const backendUrl = getBackendUrl();
@@ -31,9 +38,10 @@ export async function POST(request: NextRequest) {
       headers: {
         'Content-Type': 'application/json',
         'Connection': 'keep-alive',
+        'Keep-Alive': 'timeout=900',
       },
       body: JSON.stringify(body),
-      signal: createTimeoutSignal(900000), // 15 minutes to match Lambda timeout
+      signal: createTimeoutSignal(900000), // 15 minutes (900000ms)
     });
 
     const duration = Date.now() - startTime;
@@ -104,12 +112,26 @@ export async function POST(request: NextRequest) {
     });
     
     const errorMessage = error instanceof Error ? error.message : 'Failed to fetch AI dashboard insights';
+    
+    // Check if it's a timeout error
+    const isTimeout = error instanceof Error && (
+      error.name === 'AbortError' || 
+      error.message.includes('timeout') || 
+      error.message.includes('Gateway Timeout')
+    );
+    
     return NextResponse.json(
       { 
         error: errorMessage,
+        isTimeout,
         details: process.env.NODE_ENV === 'development' ? errorDetails : undefined
       },
-      { status: 500 }
+      { 
+        status: isTimeout ? 504 : 500,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+        }
+      }
     );
   }
 }
