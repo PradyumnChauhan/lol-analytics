@@ -1,5 +1,7 @@
 # LoL Analytics
 
+**Level up your League gameplay with AI-powered analytics, comprehensive match insights, and personalized performance tracking.**
+
 A comprehensive League of Legends analytics platform that provides detailed player statistics, match analysis, champion mastery tracking, and AI-powered insights. Built with Next.js, React, and TypeScript.
 
 ![LoL Analytics](https://img.shields.io/badge/Next.js-15.5.4-black?style=for-the-badge&logo=next.js)
