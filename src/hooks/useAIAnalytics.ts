@@ -75,85 +75,135 @@ export function useAIAnalytics(): UseAIAnalyticsReturn {
     setLoading(true);
     setError(null);
 
+    let jobId: string | null = null;
+    let pollInterval: NodeJS.Timeout | null = null;
+    const maxPollTime = 20 * 60 * 1000; // 20 minutes max
+    const pollStartTime = Date.now();
+
     try {
-      // Use Next.js API route with 15-minute timeout support
-      // The route is configured with maxDuration = 900 seconds (15 minutes)
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 16 * 60 * 1000); // 16 minutes to be safe
-      
-      const response = await fetch('/api/ai/dashboard-insights', {
+      // Step 1: Start the async job
+      console.log('[AI] Starting async dashboard insights job...');
+      const startResponse = await fetch('/api/ai/dashboard-insights/start', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ playerData }),
-        signal: controller.signal,
       });
-      
-      clearTimeout(timeoutId);
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        const errorMessage = errorData.error || `Failed to fetch dashboard insights: ${response.status}`;
-        
-        // Provide helpful error messages based on status and error type
-        if (response.status === 504) {
-          throw new Error(`${errorMessage}. Gateway timeout - request may take up to 15 minutes.`);
-        } else if (response.status === 500) {
-          // Check if it's a network/connection error
-          if (errorData.errorType === 'Network error' || errorData.errorType === 'Connection refused' || errorMessage.includes('Failed to connect')) {
-            throw new Error(`${errorMessage}. The backend server may be down or unreachable. Please check if the backend is running and accessible.`);
-          } else {
-            throw new Error(`${errorMessage}. Server error - the AI processing may have failed. Please try again.`);
-          }
-        } else {
-          throw new Error(errorMessage);
+      if (!startResponse.ok) {
+        const errorData = await startResponse.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || `Failed to start job: ${startResponse.status}`);
+      }
+
+      const startData = await startResponse.json();
+      jobId = startData.jobId;
+      console.log(`[AI] Job started with ID: ${jobId}`);
+
+      // Step 2: Poll for job status
+      const pollJobStatus = async (): Promise<void> => {
+        if (!jobId) {
+          if (pollInterval) clearInterval(pollInterval);
+          return;
         }
-      }
 
-      const data = await response.json();
-      
-      // Handle both structured and legacy response formats
-      let insights: DashboardInsights;
-      
-      if (data.insights && Array.isArray(data.insights)) {
-        // Structured format with insight cards
-        insights = {
-          insights: data.insights as InsightCard[],
-          analysisType: data.analysisType || 'dashboard',
-          matchesAnalyzed: data.matchesAnalyzed || 0,
-          model: data.model,
-          prompt: data.prompt,
-          promptMetadata: data.promptMetadata,
-        };
-      } else if (typeof data.insights === 'string') {
-        // Legacy text format
-        insights = {
-        insights: data.insights,
-          analysisType: data.analysisType || 'dashboard',
-          matchesAnalyzed: data.matchesAnalyzed || 0,
-          model: data.model,
-          prompt: data.prompt,
-          promptMetadata: data.promptMetadata,
-        };
-      } else {
-        // Fallback: treat as structured response object
-        insights = {
-          insights: data as DashboardInsightsResponse,
-          analysisType: data.analysisType || 'dashboard',
-        matchesAnalyzed: data.matchesAnalyzed || 0,
-        model: data.model,
-          prompt: data.prompt,
-        promptMetadata: data.promptMetadata,
+        // Check if we've exceeded max poll time
+        if (Date.now() - pollStartTime > maxPollTime) {
+          if (pollInterval) clearInterval(pollInterval);
+          throw new Error('Job polling timeout - AI analysis is taking longer than expected');
+        }
+
+        try {
+          const statusResponse = await fetch(`/api/ai/dashboard-insights/status/${jobId}`);
+          
+          if (!statusResponse.ok) {
+            const errorData = await statusResponse.json().catch(() => ({ error: 'Unknown error' }));
+            throw new Error(errorData.error || `Failed to get job status: ${statusResponse.status}`);
+          }
+
+          const statusData = await statusResponse.json();
+          console.log(`[AI] Job ${jobId} status: ${statusData.status}, progress: ${statusData.progress}%`);
+
+          if (statusData.status === 'completed') {
+            // Step 3: Get the result
+            const resultResponse = await fetch(`/api/ai/dashboard-insights/result/${jobId}`);
+            
+            if (!resultResponse.ok) {
+              const errorData = await resultResponse.json().catch(() => ({ error: 'Unknown error' }));
+              throw new Error(errorData.error || `Failed to get job result: ${resultResponse.status}`);
+            }
+
+            const resultData = await resultResponse.json();
+            
+            // Handle both structured and legacy response formats
+            let insights: DashboardInsights;
+            
+            if (resultData.insights && Array.isArray(resultData.insights)) {
+              // Structured format with insight cards
+              insights = {
+                insights: resultData.insights as InsightCard[],
+                analysisType: resultData.analysisType || 'dashboard',
+                matchesAnalyzed: resultData.matchesAnalyzed || 0,
+                model: resultData.model,
+                prompt: resultData.prompt,
+                promptMetadata: resultData.promptMetadata,
+              };
+            } else if (typeof resultData.insights === 'string') {
+              // Legacy text format
+              insights = {
+                insights: resultData.insights,
+                analysisType: resultData.analysisType || 'dashboard',
+                matchesAnalyzed: resultData.matchesAnalyzed || 0,
+                model: resultData.model,
+                prompt: resultData.prompt,
+                promptMetadata: resultData.promptMetadata,
+              };
+            } else {
+              // Fallback: treat as structured response object
+              insights = {
+                insights: resultData as DashboardInsightsResponse,
+                analysisType: resultData.analysisType || 'dashboard',
+                matchesAnalyzed: resultData.matchesAnalyzed || 0,
+                model: resultData.model,
+                prompt: resultData.prompt,
+                promptMetadata: resultData.promptMetadata,
+              };
+            }
+
+            setDashboardInsights(insights);
+            insightsCache.set(cacheKey, { data: insights, timestamp: Date.now() });
+            
+            // Clear polling interval and finish
+            if (pollInterval) {
+              clearInterval(pollInterval);
+              pollInterval = null;
+            }
+            setLoading(false);
+            lastFetchRef.current = '';
+          } else if (statusData.status === 'failed') {
+            if (pollInterval) clearInterval(pollInterval);
+            throw new Error(statusData.error || 'Job failed');
+          }
+          // If status is 'pending' or 'processing', continue polling (interval will handle it)
+        } catch (err) {
+          if (pollInterval) clearInterval(pollInterval);
+          throw err;
+        }
       };
-      }
 
-      setDashboardInsights(insights);
-      insightsCache.set(cacheKey, { data: insights, timestamp: Date.now() });
+      // Start polling immediately, then every 5 seconds
+      await pollJobStatus();
+      pollInterval = setInterval(pollJobStatus, 5000);
+
     } catch (err: unknown) {
       console.error('Failed to fetch dashboard insights:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch AI insights');
-    } finally {
+      
+      // Clean up polling interval
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
       setLoading(false);
       lastFetchRef.current = '';
     }

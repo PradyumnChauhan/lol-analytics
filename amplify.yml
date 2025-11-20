@@ -20,4 +20,8 @@ frontend:
     paths:
       - node_modules/**/*
 
+# Note: For API routes with long timeouts (15 minutes), ensure that:
+# 1. The route has maxDuration = 900 (15 minutes) configured (see src/app/api/ai/dashboard-insights/route.ts)
+# 2. AWS Amplify Lambda function timeout is configured to at least 15 minutes in the AWS Console
+# 3. Amplify's API Gateway timeout may need to be increased through AWS Console or CloudFormation
 

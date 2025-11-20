@@ -7,8 +7,13 @@ import { getBackendUrl } from '@/lib/utils/backend-url';
  * 
  * This endpoint can take up to 15 minutes to process, so we configure
  * the route to allow extended execution time.
+ * 
+ * IMPORTANT: For AWS Amplify deployments, ensure that:
+ * 1. The Lambda function timeout is set to at least 15 minutes (900 seconds) in AWS Console
+ * 2. Amplify's API Gateway timeout may need to be increased (default is 30 seconds)
+ * 3. This is configured via maxDuration = 900 which sets the Lambda timeout
  */
-export const maxDuration = 900; // 15 minutes in seconds
+export const maxDuration = 900; // 15 minutes in seconds - this configures Lambda timeout
 export const runtime = 'nodejs'; // Use Node.js runtime for longer timeouts
 export const dynamic = 'force-dynamic'; // Ensure dynamic rendering
 
