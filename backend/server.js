@@ -1093,6 +1093,35 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000); // Cleanup every 5 minutes
 
+// Async job storage for long-running AI operations
+// In production, use Redis or DynamoDB for persistence
+const jobStorage = new Map();
+const JOB_TTL = 20 * 60 * 1000; // 20 minutes - jobs expire after 20 minutes
+
+// Job statuses
+const JOB_STATUS = {
+  PENDING: 'pending',
+  PROCESSING: 'processing',
+  COMPLETED: 'completed',
+  FAILED: 'failed'
+};
+
+// Generate unique job ID
+function generateJobId() {
+  return `job_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+}
+
+// Cleanup old jobs periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [jobId, job] of jobStorage.entries()) {
+    if (now - job.createdAt > JOB_TTL) {
+      jobStorage.delete(jobId);
+      console.log(`[Job Cleanup] Removed expired job: ${jobId}`);
+    }
+  }
+}, 5 * 60 * 1000); // Cleanup every 5 minutes
+
 app.post('/api/ai/analyze', async (req, res) => {
   try {
     const bedrockUrl = getBedrockLambdaUrl();
@@ -1149,7 +1178,7 @@ app.post('/api/ai/analyze', async (req, res) => {
   }
 });
 
-// AI Dashboard Insights endpoint - Comprehensive analysis
+// AI Dashboard Insights endpoint - Comprehensive analysis (SYNC - kept for backward compatibility)
 app.post('/api/ai/dashboard-insights', async (req, res) => {
   try {
     const bedrockUrl = getBedrockLambdaUrl();
@@ -1239,6 +1268,221 @@ app.post('/api/ai/dashboard-insights', async (req, res) => {
     });
   }
 });
+
+// ASYNC JOB ENDPOINTS - Work around AWS Amplify 30-second gateway timeout
+// Start async job for dashboard insights
+app.post('/api/ai/dashboard-insights/start', async (req, res) => {
+  try {
+    const bedrockUrl = getBedrockLambdaUrl();
+    
+    if (!bedrockUrl) {
+      return res.status(500).json({
+        error: 'Bedrock Lambda URL not configured',
+        details: 'Set BEDROCK_LAMBDA_URL environment variable'
+      });
+    }
+
+    const { playerData } = req.body;
+    
+    if (!playerData || !playerData.playerInfo) {
+      return res.status(400).json({
+        error: 'playerData with playerInfo is required'
+      });
+    }
+    
+    // Generate job ID
+    const jobId = generateJobId();
+    const playerName = `${playerData.playerInfo.gameName || ''}#${playerData.playerInfo.tagLine || ''}`;
+    
+    // Create job entry
+    const job = {
+      id: jobId,
+      status: JOB_STATUS.PENDING,
+      playerName,
+      createdAt: Date.now(),
+      startedAt: null,
+      completedAt: null,
+      result: null,
+      error: null,
+      progress: 0
+    };
+    
+    jobStorage.set(jobId, job);
+    
+    console.log(`🚀 [AI Job] Started async job ${jobId} for ${playerName}`);
+    
+    // Start processing asynchronously (don't await)
+    processDashboardInsightsJob(jobId, playerData, bedrockUrl).catch(err => {
+      console.error(`❌ [AI Job] Job ${jobId} failed:`, err.message);
+      const job = jobStorage.get(jobId);
+      if (job) {
+        job.status = JOB_STATUS.FAILED;
+        job.error = err.message;
+        job.completedAt = Date.now();
+      }
+    });
+    
+    // Return immediately with job ID
+    res.json({
+      success: true,
+      jobId,
+      status: JOB_STATUS.PENDING,
+      message: 'Job started. Use /api/ai/dashboard-insights/status/:jobId to check status.',
+      estimatedTime: '5-15 minutes'
+    });
+    
+  } catch (error) {
+    console.error('❌ [AI Job] Failed to start job:', error.message);
+    res.status(500).json({
+      error: 'Failed to start job',
+      details: error.message
+    });
+  }
+});
+
+// Check job status
+app.get('/api/ai/dashboard-insights/status/:jobId', (req, res) => {
+  const { jobId } = req.params;
+  const job = jobStorage.get(jobId);
+  
+  if (!job) {
+    return res.status(404).json({
+      error: 'Job not found',
+      jobId
+    });
+  }
+  
+  res.json({
+    jobId: job.id,
+    status: job.status,
+    progress: job.progress,
+    createdAt: new Date(job.createdAt).toISOString(),
+    startedAt: job.startedAt ? new Date(job.startedAt).toISOString() : null,
+    completedAt: job.completedAt ? new Date(job.completedAt).toISOString() : null,
+    error: job.error,
+    playerName: job.playerName
+  });
+});
+
+// Get job result (only available when status is 'completed')
+app.get('/api/ai/dashboard-insights/result/:jobId', (req, res) => {
+  const { jobId } = req.params;
+  const job = jobStorage.get(jobId);
+  
+  if (!job) {
+    return res.status(404).json({
+      error: 'Job not found',
+      jobId
+    });
+  }
+  
+  if (job.status === JOB_STATUS.FAILED) {
+    return res.status(500).json({
+      error: 'Job failed',
+      jobId,
+      details: job.error
+    });
+  }
+  
+  if (job.status !== JOB_STATUS.COMPLETED) {
+    return res.status(202).json({
+      error: 'Job not completed yet',
+      jobId,
+      status: job.status,
+      message: 'Job is still processing. Check status endpoint for updates.'
+    });
+  }
+  
+  // Return the result
+  res.json({
+    success: true,
+    jobId,
+    ...job.result
+  });
+});
+
+// Async function to process the job
+async function processDashboardInsightsJob(jobId, playerData, bedrockUrl) {
+  const job = jobStorage.get(jobId);
+  if (!job) {
+    throw new Error(`Job ${jobId} not found`);
+  }
+  
+  try {
+    // Update job status to processing
+    job.status = JOB_STATUS.PROCESSING;
+    job.startedAt = Date.now();
+    job.progress = 10;
+    jobStorage.set(jobId, job);
+    
+    const playerName = `${playerData.playerInfo.gameName || ''}#${playerData.playerInfo.tagLine || ''}`;
+    console.log(`🔄 [AI Job] Processing job ${jobId} for ${playerName}`);
+    
+    // Update progress
+    job.progress = 30;
+    jobStorage.set(jobId, job);
+    
+    // Call Bedrock Lambda function
+    const response = await axios.post(bedrockUrl, {
+      playerData,
+      analysisType: 'dashboard'
+    }, {
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      timeout: 900000 // 15 minutes
+    });
+    
+    job.progress = 80;
+    jobStorage.set(jobId, job);
+    
+    const aiResponse = response.data;
+    
+    // Parse the response body if it's a string
+    const responseData = typeof aiResponse.body === 'string' ? JSON.parse(aiResponse.body) : aiResponse;
+    
+    // Log the prompt that was sent
+    if (responseData.prompt) {
+      console.log(`\n📝 [AI Job] Job ${jobId} - PROMPT SENT TO BEDROCK:`);
+      console.log(`Prompt length: ${responseData.promptLength || responseData.prompt.length} characters`);
+      console.log(`Model: ${responseData.modelUsed || responseData.model}\n`);
+    }
+    
+    // Update job with result
+    job.status = JOB_STATUS.COMPLETED;
+    job.progress = 100;
+    job.completedAt = Date.now();
+    job.result = {
+      insights: responseData.insights || aiResponse.insights,
+      analysisType: responseData.analysisType || aiResponse.analysisType,
+      matchesAnalyzed: responseData.matchesAnalyzed || aiResponse.matchesAnalyzed || 0,
+      model: responseData.model || aiResponse.model,
+      prompt: responseData.prompt,
+      promptMetadata: {
+        promptLength: responseData.promptLength || (responseData.prompt?.length || 0),
+        modelUsed: responseData.modelUsed || responseData.model,
+        maxTokens: responseData.maxTokens
+      },
+      _metadata: {
+        timestamp: new Date().toISOString(),
+        source: 'Amazon Bedrock',
+        player: playerName
+      }
+    };
+    
+    jobStorage.set(jobId, job);
+    
+    console.log(`✅ [AI Job] Job ${jobId} completed successfully`);
+    
+  } catch (error) {
+    console.error(`❌ [AI Job] Job ${jobId} failed:`, error.message);
+    job.status = JOB_STATUS.FAILED;
+    job.error = error.response?.data || error.message;
+    job.completedAt = Date.now();
+    jobStorage.set(jobId, job);
+    throw error;
+  }
+}
 
 // AI Chat endpoint - Conversational queries with real-time streaming
 app.post('/api/ai/chat', async (req, res) => {
